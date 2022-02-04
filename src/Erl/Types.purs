@@ -45,6 +45,14 @@ type PosInt
 
 foreign import data Ref :: Type
 
+instance Show Ref where
+  show = showRef
+instance Eq Ref where
+  eq = eqRef
+
+foreign import showRef :: Ref -> String
+foreign import eqRef :: Ref -> Ref -> Boolean
+
 newtype Octet
   = Octet Int
 

@@ -60,7 +60,8 @@ tryNoproc(E) -> fun() ->
   try E() of
     Result -> {just, Result}
   catch
-    exit:{noproc, _} -> {nothing}
+    exit:{noproc, _} -> {nothing};
+    exit:noproc -> {nothing}
   end
 end.
 
