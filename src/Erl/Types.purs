@@ -1,27 +1,29 @@
 module Erl.Types
-  ( NonNegInt
-  , PosInt
+  ( FfiMilliseconds
+  , Hextet(..)
+  , IntOrInfinity(..)
+  , Microsecond(..)
   , MonotonicTime(..)
+  , Nanosecond(..)
   , NativeTime(..)
+  , NonNegInt
+  , Octet(..)
+  , PosInt
+  , Ref
+  , Second(..)
   , StrictlyMonotonicInt(..)
   , TimeOffset(..)
-  , Second(..)
-  , Microsecond(..)
-  , Nanosecond(..)
   , Timeout(..)
-  , IntOrInfinity(..)
-  , Ref
-  , Octet(..)
-  , Hextet(..)
-  , class ToErl
-  , toErl
   , addMilliseconds
+  , class ToErl
   , delMilliseconds
-  , FfiMilliseconds -- Don't export the constructor
-  , toFfiMilliseconds
   , fromFfiMilliseconds
-  , octet
   , hextet
+  , octet
+  , refToString
+  , stringToRef
+  , toErl
+  , toFfiMilliseconds
   ) where
 
 import Prelude
@@ -52,6 +54,8 @@ instance Eq Ref where
 
 foreign import showRef :: Ref -> String
 foreign import eqRef :: Ref -> Ref -> Boolean
+foreign import refToString :: Ref -> String
+foreign import stringToRef :: String -> Maybe Ref
 
 newtype Octet
   = Octet Int
@@ -94,6 +98,9 @@ newtype MonotonicTime
 
 derive instance Eq MonotonicTime
 derive newtype instance Ord MonotonicTime
+derive instance Generic MonotonicTime _
+instance Show MonotonicTime where
+  show = genericShow
 
 newtype NativeTime
   = NativeTime Int
