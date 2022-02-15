@@ -14,7 +14,8 @@
         , monotonicStartTime_/1
         , strictlyMonotonicInt_/1
         , currentTimeOffset_/1
-        , nativeTimeToMilliseconds_/2
+        , nativeTimeToMilliseconds_/1
+        , millisecondsToNativeTime_/1
         , node/0
         ]).
 
@@ -70,8 +71,11 @@ monotonicTime_(Ctor) ->
 monotonicStartTime_(Ctor) ->
   Ctor(erlang:system_info(start_time)).
 
-nativeTimeToMilliseconds_(Ctor, Time) ->
-  Ctor(erlang:convert_time_unit(Time, native, millisecond)).
+nativeTimeToMilliseconds_(Time) ->
+  erlang:convert_time_unit(Time, native, microsecond) / 1000.
+
+millisecondsToNativeTime_(Time) ->
+  erlang:convert_time_unit(erlang:round(Time * 1000), microsecond, native).
 
 strictlyMonotonicInt_(Ctor) ->
   fun() ->
@@ -82,8 +86,5 @@ currentTimeOffset_(Ctor) ->
   fun() ->
     Ctor(erlang:time_offset())
   end.
-
-nativeTimeToMilliseconds_(Time) ->
-  erlang:convert_time_unit(Time, native, millisecond).
 
 node() -> fun() -> erlang:node() end.

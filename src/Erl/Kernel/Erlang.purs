@@ -16,12 +16,13 @@ module Erl.Kernel.Erlang
   , currentTimeOffset
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
+  , millisecondsToNativeTime
   , node
   ) where
 
 import Prelude
 import Data.DateTime.Instant (Instant, instant)
-import Data.Int (toNumber)
+import Data.Int (round)
 import Data.Maybe (Maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
@@ -71,9 +72,15 @@ monotonicTimeDelta (MonotonicTime start) (MonotonicTime end) =
 
 nativeTimeToMilliseconds :: NativeTime -> Milliseconds
 nativeTimeToMilliseconds (NativeTime t) =
-  nativeTimeToMilliseconds_ (Milliseconds <<< toNumber) t
+  nativeTimeToMilliseconds_ t
 
-foreign import nativeTimeToMilliseconds_ :: (Int -> Milliseconds) -> Int -> Milliseconds
+foreign import nativeTimeToMilliseconds_ :: Int -> Milliseconds
+
+millisecondsToNativeTime :: Milliseconds -> NativeTime
+millisecondsToNativeTime (Milliseconds t) =
+  millisecondsToNativeTime_ $ round t
+
+foreign import millisecondsToNativeTime_ :: Int -> NativeTime
 
 currentTimeOffset :: Effect TimeOffset
 currentTimeOffset = currentTimeOffset_ TimeOffset
