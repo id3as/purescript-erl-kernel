@@ -98,6 +98,7 @@ newtype MonotonicTime
 
 derive instance Eq MonotonicTime
 derive newtype instance Ord MonotonicTime
+derive instance Newtype MonotonicTime _
 derive instance Generic MonotonicTime _
 instance Show MonotonicTime where
   show = genericShow
@@ -107,6 +108,10 @@ newtype NativeTime
 
 derive instance Eq NativeTime
 derive newtype instance Ord NativeTime
+derive instance Newtype NativeTime _
+derive instance Generic NativeTime _
+instance Show NativeTime where
+  show = genericShow
 
 newtype TimeOffset
   = TimeOffset Int
