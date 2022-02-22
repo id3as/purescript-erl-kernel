@@ -4,9 +4,10 @@
         , osType/0
         ]).
 
-cmdImpl(Command) -> fun() ->
-                      os:cmd(binary_to_list(Command), #{ max_size => infinity })
-                    end.
+cmdImpl(Command) ->
+    fun() ->
+            list_to_binary(os:cmd(binary_to_list(Command), #{ max_size => infinity }))
+    end.
 
 osType() ->
     fun() ->
