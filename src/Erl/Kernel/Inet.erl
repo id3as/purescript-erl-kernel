@@ -12,6 +12,7 @@
         , trueSocketOptVal/0
         , falseSocketOptVal/0
         , getIfAddressesImpl/2
+        , getHostByName/1
         ]).
 
 %% FFI Helpers
@@ -19,6 +20,8 @@
 -define(nothing, {nothing}).
 -define(ip4(A), {ip4, A}).
 -define(ip6(A), {ip6, A}).
+
+-include_lib("kernel/include/inet.hrl").
 
 
 posixErrorToPursImpl(eaddrinuse) -> ?just({eaddrinuse});
@@ -209,3 +212,12 @@ ipTupleToPurs(Ip) when tuple_size(Ip) == 4 ->
   ?ip4(Ip);
 ipTupleToPurs(Ip) when tuple_size(Ip) == 8 ->
   ?ip6(Ip).
+
+
+getHostByName(Host) ->
+  fun() ->
+    case inet:gethostbyname(unicode:characters_to_list(Host, utf8)) of
+      { ok, #hostent { h_addr_list = [ Head | _ ] } } -> { right, Head };
+      { error, Error } -> { left, Error }
+    end
+  end.

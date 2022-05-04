@@ -61,6 +61,11 @@ module Erl.Kernel.Inet
   , parseIp4Address
   , parseIp6Address
   , parseIpAddress
+  , printIpAddress
+  , printIpv4
+  , printIpv6
+  , getHostByName
+  , hostAddressToIp
   , posixErrorToPurs
   , recv
   , send
@@ -88,6 +93,7 @@ import Erl.Data.List (List, filterMap, nil, (:))
 import Erl.Data.Map (Map, lookup)
 import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4, tuple8, uncurry4, uncurry8)
 import Erl.Kernel.File as File
+import Data.Int (decimal, hexadecimal, toStringAs)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl, Octet(..), Hextet(..), hextet, octet)
 import Erl.Untagged.Union (class RuntimeType, type (|+|), Nil, RTInt, RTTuple4, RTTuple8, Union)
 import Foreign (Foreign, unsafeToForeign)
@@ -128,9 +134,9 @@ instance (Row.Lacks "active" options) => OptionsValid PassiveSocket options
 
 class Socket socket where
   send :: socket -> IOData -> Effect (Either SendError Unit)
-
+  
   recv :: socket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
-
+  
   close :: socket -> Effect Unit
 
 data PosixError
@@ -519,6 +525,54 @@ foreign import activeErrorToPursImpl :: (Foreign -> Maybe ActiveError) -> Foreig
 
 foreign import connectErrorToPursImpl :: (Foreign -> Maybe ConnectError) -> Foreign -> Maybe ConnectError
 
+foreign import getHostByName :: Hostname -> Effect (Either Foreign IpAddress)
+
+hostAddressToIp :: HostAddress -> Effect (Either Foreign IpAddress)
+hostAddressToIp (Host name) = getHostByName name
+hostAddressToIp (Ip ip) = pure $ pure ip
+
+printIpv4 :: Ip4Address -> String
+printIpv4 (Ip4Address tuple4) =
+  uncurry4
+    ( \(Octet o1) (Octet o2) (Octet o3) (Octet o4) ->
+        (toStringAs decimal o1)
+          <> "."
+          <> (toStringAs decimal o2)
+          <> "."
+          <> (toStringAs decimal o3)
+          <> "."
+          <> (toStringAs decimal o4)
+    )
+    tuple4
+
+printIpv6 :: Ip6Address -> String
+printIpv6 (Ip6Address tuple8) =
+  uncurry8
+    ( \(Hextet h1) (Hextet h2) (Hextet h3) (Hextet h4) (Hextet h5) (Hextet h6) (Hextet h7) (Hextet h8) ->
+        (toStringAs hexadecimal h1)
+          <> ":"
+          <> (toStringAs hexadecimal h2)
+          <> ":"
+          <> (toStringAs hexadecimal h3)
+          <> ":"
+          <> (toStringAs hexadecimal h4)
+          <> ":"
+          <> (toStringAs hexadecimal h5)
+          <> ":"
+          <> (toStringAs hexadecimal h6)
+          <> ":"
+          <> (toStringAs hexadecimal h7)
+          <> ":"
+          <> (toStringAs hexadecimal h8)
+    )
+    tuple8
+
+printIpAddress :: IpAddress -> String
+printIpAddress (Ip4 v4) =
+  printIpv4 v4
+
+printIpAddress (Ip6 v6) =
+  printIpv6 v6
 ------------------------------------------------------------------------------
 -- IP Address helpers
 ------------------------------------------------------------------------------
