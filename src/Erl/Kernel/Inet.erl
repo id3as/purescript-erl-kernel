@@ -216,8 +216,12 @@ ipTupleToPurs(Ip) when tuple_size(Ip) == 8 ->
 
 getHostByName(Host) ->
   fun() ->
-    case inet:gethostbyname(unicode:characters_to_list(Host, utf8)) of
-      { ok, #hostent { h_addr_list = [ Head | _ ] } } -> { right, Head };
+      case inet:gethostbyname(unicode:characters_to_list(Host, utf8)) of
+        { ok, #hostent { h_addrtype = Type,
+                         h_addr_list = [ Head | _ ] } } -> { right, case Type of
+                                                                      inet -> ?ip4(Head);
+                                                                      inet6 -> ?ip6(Head)
+                                                                    end };
       { error, Error } -> { left, Error }
     end
   end.
