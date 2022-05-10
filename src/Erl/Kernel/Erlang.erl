@@ -54,7 +54,7 @@ vmNowUs() ->
   end.
 
 termToString(Term) ->
-    iolist_to_binary(io_lib:format("~s", [Term])).
+    iolist_to_binary(io_lib:format("~p", [Term])).
 
 eqFfi(A,B) -> A == B.
 
