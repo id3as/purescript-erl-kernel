@@ -14,6 +14,7 @@ module Erl.Kernel.File
   , readFile
   , write
   , writeFile
+  , sync
   , close
   , posixErrorToPurs
   ) where
@@ -150,6 +151,12 @@ foreign import closeImpl ::
   FileHandle ->
   Effect (Either FileError Unit)
 
+foreign import syncImpl ::
+  (FileError -> Either FileError Unit) ->
+  (Either FileError Unit) ->
+  FileHandle ->
+  Effect (Either FileError Unit)
+
 data FileOpenMode
   = Read
   | Write
@@ -220,6 +227,9 @@ read = readImpl
 
 close :: FileHandle -> Effect (Either FileError Unit)
 close = closeImpl Left (Right unit)
+
+sync :: FileHandle -> Effect (Either FileError Unit)
+sync = syncImpl Left (Right unit)
 
 write :: FileHandle -> IOData -> Effect (Either FileError Unit)
 write = writeImpl Left (Right unit)

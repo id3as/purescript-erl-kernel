@@ -8,6 +8,7 @@
          writeImpl/4,
          writeFileImpl/4,
          closeImpl/3,
+         syncImpl/3,
          join/2,
          posixErrorToPurs/1
         ]).
@@ -147,6 +148,15 @@ writeFileImpl(Left, Right, FileName, Data) ->
 closeImpl(Left, Right, Handle) ->
   fun() ->
       case file:close(Handle) of
+        ok -> Right;
+        {error, Err} ->
+          Left(fileErrorToPurs(Err))
+      end
+  end.
+
+syncImpl(Left, Right, Handle) ->
+  fun() ->
+      case file:sync(Handle) of
         ok -> Right;
         {error, Err} ->
           Left(fileErrorToPurs(Err))
