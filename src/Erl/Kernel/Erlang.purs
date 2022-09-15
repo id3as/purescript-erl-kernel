@@ -1,5 +1,6 @@
 module Erl.Kernel.Erlang
-  ( makeRef
+  ( UniqueIntegerOptions(..)
+  , makeRef
   , utcNowMs
   , utcNowUs
   , vmNowMs
@@ -17,6 +18,7 @@ module Erl.Kernel.Erlang
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
   , millisecondsToNativeTime
+  , uniqueInteger
   , node
   ) where
 
@@ -24,11 +26,13 @@ import Prelude
 import Data.DateTime.Instant (Instant, instant)
 import Data.Int (round)
 import Data.Maybe (Maybe)
+import Data.Set (Set)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Erl.Atom (Atom)
 import Erl.Data.Binary (Binary)
 import Erl.Data.List (List)
+import Erl.Data.List as List
 import Erl.Process.Raw (Pid)
 import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Octet, Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
 import Foreign (Foreign)
@@ -91,6 +95,15 @@ strictlyMonotonicInt :: Effect StrictlyMonotonicInt
 strictlyMonotonicInt = strictlyMonotonicInt_ StrictlyMonotonicInt
 
 foreign import strictlyMonotonicInt_ :: (Int -> StrictlyMonotonicInt) -> Effect StrictlyMonotonicInt
+
+data UniqueIntegerOptions
+  = PositiveUniqueInteger
+  | MonotonicUniqueInteger
+
+uniqueInteger :: Set UniqueIntegerOptions -> Effect Int
+uniqueInteger options = uniqueInteger_ (List.fromFoldable options)
+
+foreign import uniqueInteger_ :: List UniqueIntegerOptions -> Effect Int
 
 monotonicTimeToInstant :: MonotonicTime -> TimeOffset -> Maybe Instant
 monotonicTimeToInstant (MonotonicTime t) (TimeOffset o) =

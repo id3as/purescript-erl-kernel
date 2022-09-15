@@ -17,6 +17,7 @@
         , nativeTimeToMilliseconds_/1
         , millisecondsToNativeTime_/1
         , node/0
+        , uniqueInteger_/1
         ]).
 
 makeRef() ->
@@ -88,3 +89,13 @@ currentTimeOffset_(Ctor) ->
   end.
 
 node() -> fun() -> erlang:node() end.
+
+uniqueInteger_(Options) ->
+  fun() ->
+    Options2 = [case Option of
+                  {positiveUniqueInteger} -> positive;
+                  {monotonicUniqueInteger} -> monotonic
+                end || Option <- Options],
+
+    erlang:unique_integer(Options2)
+  end.
