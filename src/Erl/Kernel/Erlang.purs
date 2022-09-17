@@ -23,6 +23,7 @@ module Erl.Kernel.Erlang
   ) where
 
 import Prelude
+
 import Data.DateTime.Instant (Instant, instant)
 import Data.Int (round)
 import Data.Maybe (Maybe)
@@ -99,6 +100,9 @@ foreign import strictlyMonotonicInt_ :: (Int -> StrictlyMonotonicInt) -> Effect 
 data UniqueIntegerOptions
   = PositiveUniqueInteger
   | MonotonicUniqueInteger
+
+derive instance Eq UniqueIntegerOptions
+derive instance Ord UniqueIntegerOptions
 
 uniqueInteger :: Set UniqueIntegerOptions -> Effect Int
 uniqueInteger options = uniqueInteger_ (List.fromFoldable options)
