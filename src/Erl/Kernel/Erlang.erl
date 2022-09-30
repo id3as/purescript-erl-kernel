@@ -18,6 +18,8 @@
         , millisecondsToNativeTime_/1
         , node/0
         , uniqueInteger_/1
+        , cpuTopology/0
+        , totalSystemMemory/0
         ]).
 
 makeRef() ->
@@ -98,4 +100,67 @@ uniqueInteger_(Options) ->
                 end || Option <- Options],
 
     erlang:unique_integer(Options2)
+  end.
+
+cpuTopology() ->
+  fun() ->
+      case erlang:system_info(cpu_topology) of
+        undefined -> [];
+        Topology -> nodeTopology(Topology)
+      end
+  end.
+
+%% Heirarchy for our output is nodes -> processors -> cores -> threads
+nodeTopology(NodesOrProcessors) ->
+  %% Top level could be nodes or processors
+  {Nodes, Processors} = lists:partition(fun({node, _}) ->
+                                            true;
+                                           (_) ->
+                                            false
+                                        end, NodesOrProcessors),
+  Nodes2 = case Processors of
+             [] ->
+               Nodes;
+             _ ->
+               Nodes ++ [{node, Processors}]
+           end,
+  [processorTopology(NodeProcessors) || {node, NodeProcessors} <- Nodes2].
+
+processorTopology(Processors) ->
+  %% Processors are just processors
+  [coreTopology(Cores) || {processor, Cores} <- Processors].
+
+coreTopology(CoresOrThreads) ->
+  %% Core level could be cores or threads
+  {Cores, Threads} = lists:partition(fun({core, _}) ->
+                                            true;
+                                           (_) ->
+                                            false
+                                        end, CoresOrThreads),
+  Cores2 = case Threads of
+             [] ->
+               Cores;
+             _ ->
+               Cores ++ [{core, Threads}]
+           end,
+  [threadTopology(CoreThreads) || {core, CoreThreads} <- Cores2].
+
+threadTopology({logical, Id}) ->
+  [Id];
+threadTopology([]) ->
+  [];
+threadTopology([{thread, {logical, Id}} | T]) ->
+  [Id | threadTopology(T)].
+
+totalSystemMemory() ->
+  fun() ->
+      case memsup:get_system_memory_data() of
+        [] ->
+          {nothing};
+        PropList ->
+          case lists:keyfind(system_total_memory, 1, PropList) of
+            {system_total_memory, Mem} -> {just, Mem};
+            _ -> {nothing}
+          end
+     end
   end.

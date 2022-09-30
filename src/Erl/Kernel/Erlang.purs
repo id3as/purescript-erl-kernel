@@ -1,5 +1,9 @@
 module Erl.Kernel.Erlang
   ( UniqueIntegerOptions(..)
+  , NumaNode(..)
+  , Processor(..)
+  , Core(..)
+  , LogicalCpuId(..)
   , makeRef
   , utcNowMs
   , utcNowUs
@@ -19,6 +23,8 @@ module Erl.Kernel.Erlang
   , nativeTimeToMilliseconds
   , millisecondsToNativeTime
   , uniqueInteger
+  , cpuTopology
+  , totalSystemMemory
   , node
   ) where
 
@@ -108,6 +114,18 @@ uniqueInteger :: Set UniqueIntegerOptions -> Effect Int
 uniqueInteger options = uniqueInteger_ (List.fromFoldable options)
 
 foreign import uniqueInteger_ :: List UniqueIntegerOptions -> Effect Int
+
+newtype LogicalCpuId = LogicalCpuId Int
+
+newtype Core = Core (List LogicalCpuId)
+
+newtype Processor = Processor (List Core)
+
+newtype NumaNode = NumaNode (List Processor)
+
+foreign import cpuTopology :: Effect (List NumaNode)
+
+foreign import totalSystemMemory :: Effect (Maybe Int)
 
 monotonicTimeToInstant :: MonotonicTime -> TimeOffset -> Maybe Instant
 monotonicTimeToInstant (MonotonicTime t) (TimeOffset o) =
