@@ -157,6 +157,14 @@ foreign import syncImpl ::
   FileHandle ->
   Effect (Either FileError Unit)
 
+foreign import seekImpl ::
+  (FileError -> Either FileError Int) ->
+  (Int -> Either FileError Int) ->
+  FileHandle ->
+  FilePositioning ->
+  Int ->
+  Effect (Either FileError Int)
+
 data FileOpenMode
   = Read
   | Write
@@ -182,6 +190,11 @@ data Encoding
   | Utf16Little
   | Utf32Big
   | Utf32Little
+
+data FilePositioning
+  = FromBeginning
+  | FromCurrent
+  | FromEnd
 
 type FileOpenOptions
   = ( modes :: List FileOpenMode
@@ -239,6 +252,19 @@ writeFile = writeFileImpl Left (Right unit)
 
 readFile :: FileName -> Effect (Either FileError Binary)
 readFile = readFileImpl Left Right
+
+seek :: FileHandle -> FilePositioning -> Int -> Effect (Either FileError Int)
+seek = seekImpl Left Right
+
+length :: FileHandle -> Effect (Either FileError Int)
+length file =
+  seek file FromCurrent 0 >>= case _ of
+    Left e -> pure $ Left e
+    Right current ->
+      seek file FromEnd 0 >>= case _ of
+        Left e -> pure $ Left e
+        Right theLength ->
+          map (const theLength) <$> seek file FromBeginning current
 
 newtype FileName
   = FileName String

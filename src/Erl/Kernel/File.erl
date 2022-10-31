@@ -9,6 +9,7 @@
          writeFileImpl/4,
          closeImpl/3,
          syncImpl/3,
+         seekImpl/5,
          join/2,
          posixErrorToPurs/1
         ]).
@@ -158,6 +159,21 @@ syncImpl(Left, Right, Handle) ->
   fun() ->
       case file:sync(Handle) of
         ok -> Right;
+        {error, Err} ->
+          Left(fileErrorToPurs(Err))
+      end
+  end.
+
+seekImpl(Left, Right, Handle, Position, Offset) ->
+  Location =
+    case Position of
+      fromBeginning -> bof;
+      fromCurrent -> cur;
+      fromEnd -> eof
+    end,
+  fun() ->
+      case file:position(Handle, {Location, Offset}) of
+        {ok, Cur} -> Right(Cur);
         {error, Err} ->
           Left(fileErrorToPurs(Err))
       end
