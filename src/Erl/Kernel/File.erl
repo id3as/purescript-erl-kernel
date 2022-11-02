@@ -167,9 +167,9 @@ syncImpl(Left, Right, Handle) ->
 seekImpl(Left, Right, Handle, Position, Offset) ->
   Location =
     case Position of
-      fromBeginning -> bof;
-      fromCurrent -> cur;
-      fromEnd -> eof
+      {fromBeginning} -> bof;
+      {fromCurrent} -> cur;
+      {fromEnd} -> eof
     end,
   fun() ->
       case file:position(Handle, {Location, Offset}) of
