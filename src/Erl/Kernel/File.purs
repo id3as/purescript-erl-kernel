@@ -6,6 +6,7 @@ module Erl.Kernel.File
   , FileName(..)
   , FileOpenMode(..)
   , FileOutputType(..)
+  , FilePositioning(..)
   , FileDelayedWrite(..)
   , FileReadAhead(..)
   , Encoding(..)
@@ -15,6 +16,8 @@ module Erl.Kernel.File
   , write
   , writeFile
   , sync
+  , seek
+  , length
   , close
   , posixErrorToPurs
   ) where
