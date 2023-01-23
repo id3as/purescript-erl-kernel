@@ -21,6 +21,7 @@ module Erl.Kernel.Erlang
   , currentTimeOffset
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
+  , microsecondsToMilliseconds
   , millisecondsToNativeTime
   , uniqueInteger
   , cpuTopology
@@ -31,7 +32,7 @@ module Erl.Kernel.Erlang
 import Prelude
 
 import Data.DateTime.Instant (Instant, instant)
-import Data.Int (round)
+import Data.Int (round, toNumber)
 import Data.Maybe (Maybe)
 import Data.Set (Set)
 import Data.Time.Duration (Milliseconds(..))
@@ -41,7 +42,7 @@ import Erl.Data.Binary (Binary)
 import Erl.Data.List (List)
 import Erl.Data.List as List
 import Erl.Process.Raw (Pid)
-import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Octet, Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
+import Erl.Types (FfiMilliseconds, Microsecond(..), MonotonicTime(..), NativeTime(..), Octet, Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
 import Foreign (Foreign)
 
 foreign import makeRef :: Effect Ref
@@ -50,7 +51,7 @@ foreign import utcNowMs :: Effect FfiMilliseconds
 
 foreign import utcNowUs :: Effect Microsecond
 
-foreign import vmNowMs :: Effect Microsecond
+foreign import vmNowMs :: Effect FfiMilliseconds
 
 foreign import vmNowUs :: Effect Microsecond
 
@@ -84,6 +85,10 @@ monotonicTimeDelta (MonotonicTime start) (MonotonicTime end) =
 nativeTimeToMilliseconds :: NativeTime -> Milliseconds
 nativeTimeToMilliseconds (NativeTime t) =
   nativeTimeToMilliseconds_ t
+
+microsecondsToMilliseconds :: Microsecond -> Milliseconds
+microsecondsToMilliseconds (Microsecond us) =
+  Milliseconds $ (toNumber us) / 1000.0
 
 foreign import nativeTimeToMilliseconds_ :: Int -> Milliseconds
 
