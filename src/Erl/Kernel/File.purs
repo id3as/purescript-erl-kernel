@@ -19,6 +19,8 @@ module Erl.Kernel.File
   , seek
   , length
   , close
+  , copy
+  , delete
   , posixErrorToPurs
   ) where
 
@@ -154,6 +156,12 @@ foreign import closeImpl ::
   FileHandle ->
   Effect (Either FileError Unit)
 
+foreign import deleteImpl ::
+  (FileError -> Either FileError Unit) ->
+  (Either FileError Unit) ->
+  FileName ->
+  Effect (Either FileError Unit)
+
 foreign import syncImpl ::
   (FileError -> Either FileError Unit) ->
   (Either FileError Unit) ->
@@ -166,6 +174,14 @@ foreign import seekImpl ::
   FileHandle ->
   FilePositioning ->
   Int ->
+  Effect (Either FileError Int)
+
+foreign import copyImpl ::
+  (FileError -> Either FileError Int) ->
+  (Int -> Either FileError Int) ->
+  FileHandle ->
+  FileHandle ->
+  Maybe Int ->
   Effect (Either FileError Int)
 
 data FileOpenMode
@@ -244,6 +260,9 @@ read = readImpl
 close :: FileHandle -> Effect (Either FileError Unit)
 close = closeImpl Left (Right unit)
 
+delete :: FileName -> Effect (Either FileError Unit)
+delete = deleteImpl Left (Right unit)
+
 sync :: FileHandle -> Effect (Either FileError Unit)
 sync = syncImpl Left (Right unit)
 
@@ -268,6 +287,9 @@ length file =
         Left e -> pure $ Left e
         Right theLength ->
           map (const theLength) <$> seek file FromBeginning current
+
+copy :: FileHandle -> FileHandle -> Maybe Int -> Effect (Either FileError Int)
+copy = copyImpl Left Right
 
 newtype FileName
   = FileName String

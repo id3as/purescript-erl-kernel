@@ -10,6 +10,8 @@
          closeImpl/3,
          syncImpl/3,
          seekImpl/5,
+         copyImpl/5,
+         deleteImpl/3,
          join/2,
          posixErrorToPurs/1
         ]).
@@ -155,6 +157,15 @@ closeImpl(Left, Right, Handle) ->
       end
   end.
 
+deleteImpl(Left, Right, Handle) ->
+  fun() ->
+      case file:delete(Handle) of
+        ok -> Right;
+        {error, Err} ->
+          Left(fileErrorToPurs(Err))
+      end
+  end.
+
 syncImpl(Left, Right, Handle) ->
   fun() ->
       case file:sync(Handle) of
@@ -176,6 +187,19 @@ seekImpl(Left, Right, Handle, Position, Offset) ->
         {ok, Cur} -> Right(Cur);
         {error, Err} ->
           Left(fileErrorToPurs(Err))
+      end
+  end.
+
+copyImpl(Left, Right, Handle1, Handle2, Amount) ->
+  BytesToCopy =
+    case Amount of
+      {nothing} -> infinity;
+      {just, ByteCount} -> ByteCount
+    end,
+  fun () ->
+      case file:copy(Handle1, Handle2, BytesToCopy) of
+        {ok, BytesCopied} -> Right(BytesCopied);
+        {err, Err} -> Left(fileErrorToPurs(Err))
       end
   end.
 
