@@ -13,7 +13,8 @@
          copyImpl/5,
          deleteImpl/3,
          join/2,
-         posixErrorToPurs/1
+         posixErrorToPurs/1,
+         cwdImpl/2
         ]).
 
 join(Left, Right) ->
@@ -199,7 +200,15 @@ copyImpl(Left, Right, Handle1, Handle2, Amount) ->
   fun () ->
       case file:copy(Handle1, Handle2, BytesToCopy) of
         {ok, BytesCopied} -> Right(BytesCopied);
-        {err, Err} -> Left(fileErrorToPurs(Err))
+        {error, Err} -> Left(fileErrorToPurs(Err))
+      end
+  end.
+
+cwdImpl(Left, Right) ->
+  fun() ->
+      case file:get_cwd() of
+        {ok, Cwd} -> Right(Cwd);
+        {error, Err} -> Left(fileErrorToPurs(Err))
       end
   end.
 

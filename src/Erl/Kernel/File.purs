@@ -21,6 +21,7 @@ module Erl.Kernel.File
   , close
   , copy
   , delete
+  , cwd
   , posixErrorToPurs
   ) where
 
@@ -114,75 +115,80 @@ instance fileError_show :: Show FileError where
 
 foreign import data FileHandle :: Type
 
-foreign import openImpl ::
-  forall options.
-  (FileError -> Either FileError FileHandle) ->
-  (FileHandle -> Either FileError FileHandle) ->
-  Record (FileOpenOptions) ->
-  FileName ->
-  Record ( modes :: List FileOpenMode | options ) ->
-  Effect (Either FileError FileHandle)
+foreign import openImpl
+  :: forall options
+   . (FileError -> Either FileError FileHandle)
+  -> (FileHandle -> Either FileError FileHandle)
+  -> Record (FileOpenOptions)
+  -> FileName
+  -> Record (modes :: List FileOpenMode | options)
+  -> Effect (Either FileError FileHandle)
 
-foreign import readImpl ::
-  FileHandle ->
-  Int ->
-  Effect (Either FileError Binary)
+foreign import readImpl
+  :: FileHandle
+  -> Int
+  -> Effect (Either FileError Binary)
 
-foreign import readFileImpl ::
-  (FileError -> Either FileError Binary) ->
-  (Binary -> Either FileError Binary) ->
-  FileName ->
-  Effect (Either FileError Binary)
+foreign import readFileImpl
+  :: (FileError -> Either FileError Binary)
+  -> (Binary -> Either FileError Binary)
+  -> FileName
+  -> Effect (Either FileError Binary)
 
-foreign import writeImpl ::
-  (FileError -> Either FileError IOData) ->
-  (Either FileError Unit) ->
-  FileHandle ->
-  IOData ->
-  Effect (Either FileError Unit)
+foreign import writeImpl
+  :: (FileError -> Either FileError IOData)
+  -> (Either FileError Unit)
+  -> FileHandle
+  -> IOData
+  -> Effect (Either FileError Unit)
 
-foreign import writeFileImpl ::
-  (FileError -> Either FileError IOData) ->
-  (Either FileError Unit) ->
-  FileName ->
-  IOData ->
-  Effect (Either FileError Unit)
+foreign import writeFileImpl
+  :: (FileError -> Either FileError IOData)
+  -> (Either FileError Unit)
+  -> FileName
+  -> IOData
+  -> Effect (Either FileError Unit)
 
 foreign import join :: FileName -> FileName -> FileName
 
-foreign import closeImpl ::
-  (FileError -> Either FileError Unit) ->
-  (Either FileError Unit) ->
-  FileHandle ->
-  Effect (Either FileError Unit)
+foreign import closeImpl
+  :: (FileError -> Either FileError Unit)
+  -> (Either FileError Unit)
+  -> FileHandle
+  -> Effect (Either FileError Unit)
 
-foreign import deleteImpl ::
-  (FileError -> Either FileError Unit) ->
-  (Either FileError Unit) ->
-  FileName ->
-  Effect (Either FileError Unit)
+foreign import deleteImpl
+  :: (FileError -> Either FileError Unit)
+  -> (Either FileError Unit)
+  -> FileName
+  -> Effect (Either FileError Unit)
 
-foreign import syncImpl ::
-  (FileError -> Either FileError Unit) ->
-  (Either FileError Unit) ->
-  FileHandle ->
-  Effect (Either FileError Unit)
+foreign import syncImpl
+  :: (FileError -> Either FileError Unit)
+  -> (Either FileError Unit)
+  -> FileHandle
+  -> Effect (Either FileError Unit)
 
-foreign import seekImpl ::
-  (FileError -> Either FileError Int) ->
-  (Int -> Either FileError Int) ->
-  FileHandle ->
-  FilePositioning ->
-  Int ->
-  Effect (Either FileError Int)
+foreign import seekImpl
+  :: (FileError -> Either FileError Int)
+  -> (Int -> Either FileError Int)
+  -> FileHandle
+  -> FilePositioning
+  -> Int
+  -> Effect (Either FileError Int)
 
-foreign import copyImpl ::
-  (FileError -> Either FileError Int) ->
-  (Int -> Either FileError Int) ->
-  FileHandle ->
-  FileHandle ->
-  Maybe Int ->
-  Effect (Either FileError Int)
+foreign import copyImpl
+  :: (FileError -> Either FileError Int)
+  -> (Int -> Either FileError Int)
+  -> FileHandle
+  -> FileHandle
+  -> Maybe Int
+  -> Effect (Either FileError Int)
+
+foreign import cwdImpl
+  :: (FileError -> Either FileError FileName)
+  -> (FileName -> Either FileError FileName)
+  -> Effect (Either FileError FileName)
 
 data FileOpenMode
   = Read
@@ -215,18 +221,18 @@ data FilePositioning
   | FromCurrent
   | FromEnd
 
-type FileOpenOptions
-  = ( modes :: List FileOpenMode
-    , raw :: Boolean
-    , output :: FileOutputType
-    , delayedWrite :: Maybe FileDelayedWrite
-    , readAhead :: Maybe FileReadAhead
-    , compressed :: Boolean
-    , encoding :: Maybe Encoding
-    , ram :: Boolean
-    , sync :: Boolean
-    , directory :: Boolean
-    )
+type FileOpenOptions =
+  ( modes :: List FileOpenMode
+  , raw :: Boolean
+  , output :: FileOutputType
+  , delayedWrite :: Maybe FileDelayedWrite
+  , readAhead :: Maybe FileReadAhead
+  , compressed :: Boolean
+  , encoding :: Maybe Encoding
+  , ram :: Boolean
+  , sync :: Boolean
+  , directory :: Boolean
+  )
 
 defaultFileOpenOptions :: Record (FileOpenOptions)
 defaultFileOpenOptions =
@@ -248,10 +254,12 @@ defaultFileOpenOptions =
 --   => URL
 --   -> Record (method :: Method | options)
 --   -> Aff Response
-open ::
-  forall options trash.
-  Row.Union options trash FileOpenOptions =>
-  FileName -> Record ( modes :: List FileOpenMode | options ) -> Effect (Either FileError FileHandle)
+open
+  :: forall options trash
+   . Row.Union options trash FileOpenOptions
+  => FileName
+  -> Record (modes :: List FileOpenMode | options)
+  -> Effect (Either FileError FileHandle)
 open = openImpl Left Right defaultFileOpenOptions
 
 read :: FileHandle -> Int -> Effect (Either FileError Binary)
@@ -291,8 +299,10 @@ length file =
 copy :: FileHandle -> FileHandle -> Maybe Int -> Effect (Either FileError Int)
 copy = copyImpl Left Right
 
-newtype FileName
-  = FileName String
+cwd :: Effect (Either FileError FileName)
+cwd = cwdImpl Left Right
+
+newtype FileName = FileName String
 
 derive instance Newtype FileName _
 derive newtype instance Eq FileName
@@ -304,8 +314,7 @@ instance toErl_Filename :: ToErl FileName where
 instance semiFileName :: Semigroup FileName where
   append = join
 
-newtype Directory
-  = Directory String
+newtype Directory = Directory String
 
 derive instance Newtype Directory _
 derive newtype instance Eq Directory
