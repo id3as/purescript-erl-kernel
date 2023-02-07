@@ -207,7 +207,7 @@ copyImpl(Left, Right, Handle1, Handle2, Amount) ->
 cwdImpl(Left, Right) ->
   fun() ->
       case file:get_cwd() of
-        {ok, Cwd} -> Right(Cwd);
+        {ok, Cwd} -> Right(list_to_binary(Cwd));
         {error, Err} -> Left(fileErrorToPurs(Err))
       end
   end.
