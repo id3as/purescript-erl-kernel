@@ -13,7 +13,7 @@
         , selectOp/2
         , selectOne/2
         , delete/1
-        , delete/2
+        , delete2/2
         ]).
 
 new(Name, Options) ->
