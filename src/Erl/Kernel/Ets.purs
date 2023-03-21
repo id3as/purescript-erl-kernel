@@ -65,3 +65,8 @@ foreign import selectOne :: forall result. Table -> SelectOp -> Effect (Maybe re
 foreign import selectOp :: forall k v. k -> v -> SelectOp
 
 foreign import data SelectOp :: Type
+
+
+foreign import delete :: Table -> Effect Unit
+
+foreign import delete2 :: forall k. Table -> k -> Effect Unit

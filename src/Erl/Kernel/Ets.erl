@@ -12,6 +12,8 @@
         , select/2
         , selectOp/2
         , selectOne/2
+        , delete/1
+        , delete/2
         ]).
 
 new(Name, Options) ->
@@ -81,3 +83,14 @@ selectOne(Table, SelectOp) ->
 
 selectOp(K, V) ->
   [ {K, [], V} ].
+
+
+delete(Table) ->
+  fun() ->
+    ets:delete(Table)
+  end.
+
+delete2(Table, Key) ->
+  fun() ->
+    ets:delete(Table, Key)
+  end.
