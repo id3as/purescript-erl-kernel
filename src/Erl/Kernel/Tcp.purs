@@ -3,7 +3,7 @@ module Erl.Kernel.Tcp
   , ConnectListenOptions
   , ConnectOptions
   , ListenOptions
-  , SocketPacket
+  , SocketPacket(..)
   , OptionToMaybe(..)
   , TcpSocket
   , TcpMessage(..)
