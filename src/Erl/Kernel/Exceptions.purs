@@ -12,6 +12,7 @@ module Erl.Kernel.Exceptions
   , tryExit
   , tryNamedError
   , tryNoproc
+  , tryTimeout
   , tryThrown
   )
   where
@@ -58,6 +59,9 @@ foreign import tryThrown :: forall a. Effect a -> Effect (Either Foreign a)
 
 -- | Try evaluating the given expression, catching any exit matching `{noproc,_}` (and passing through any others)
 foreign import tryNoproc :: forall a. Effect a -> Effect (Maybe a)
+
+-- | Try evaluating the given expression, catching any exit matching `{timeout,_}` (and passing through any others)
+foreign import tryTimeout :: forall a. Effect a -> Effect (Maybe a)
 
 -- | Try evaluating the given expression, catching any error of the given name (and passing through any others)
 foreign import tryNamedError :: forall a. Atom -> Effect a -> Effect (Maybe a)

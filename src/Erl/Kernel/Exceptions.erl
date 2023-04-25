@@ -1,6 +1,6 @@
 -module(erl_kernel_exceptions@foreign).
 
--export(['throw'/1, error/1, exit/1, 'try'/1, tryError/1, tryExit/1, tryThrown/1, tryNamedError/2, tryNoproc/1, showStack/1]).
+-export(['throw'/1, error/1, exit/1, 'try'/1, tryError/1, tryExit/1, tryThrown/1, tryNamedError/2, tryNoproc/1, tryTimeout/1, showStack/1]).
 
 'throw'(E) -> fun () ->
   erlang:throw(E)
@@ -62,6 +62,14 @@ tryNoproc(E) -> fun() ->
   catch
     exit:{noproc, _} -> {nothing};
     exit:noproc -> {nothing}
+  end
+end.
+
+tryTimeout(E) -> fun() ->
+  try E() of
+    Result -> {just, Result}
+  catch
+    exit:{timeout, _} -> {nothing}
   end
 end.
 
