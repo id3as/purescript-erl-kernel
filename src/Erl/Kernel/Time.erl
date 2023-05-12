@@ -6,11 +6,10 @@
 
 
 seconds() -> fun() ->
-                   erlang:system_time(second)
-               end.
+                     float(erlang:system_time(second))
+             end.
 
 
 milliseconds() -> fun() ->
-                   erlang:system_time(millisecond)
-               end.
-
+                          float(erlang:system_time(millisecond))
+                  end.
