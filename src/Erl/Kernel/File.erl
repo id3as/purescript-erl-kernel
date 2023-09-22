@@ -14,7 +14,8 @@
          deleteImpl/3,
          join/2,
          posixErrorToPurs/1,
-         cwdImpl/2
+         cwdImpl/2,
+         isDir/1
         ]).
 
 join(Left, Right) ->
@@ -210,6 +211,11 @@ cwdImpl(Left, Right) ->
         {ok, Cwd} -> Right(list_to_binary(Cwd));
         {error, Err} -> Left(fileErrorToPurs(Err))
       end
+  end.
+
+isDir(Dir) ->
+  fun() ->
+      filelib:is_dir(Dir)
   end.
 
 posixErrorToPurs(eacces) -> {just, {eAcces}};

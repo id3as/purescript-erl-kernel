@@ -23,6 +23,7 @@ module Erl.Kernel.File
   , delete
   , cwd
   , posixErrorToPurs
+  , isDir
   ) where
 
 import Prelude hiding (join)
@@ -162,6 +163,10 @@ foreign import deleteImpl
   -> (Either FileError Unit)
   -> FileName
   -> Effect (Either FileError Unit)
+
+foreign import isDir
+  :: Directory
+  -> Effect Boolean
 
 foreign import syncImpl
   :: (FileError -> Either FileError Unit)
