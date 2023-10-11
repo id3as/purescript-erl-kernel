@@ -324,3 +324,4 @@ newtype Directory = Directory String
 derive instance Newtype Directory _
 derive newtype instance Eq Directory
 derive newtype instance Ord Directory
+derive newtype instance Show Directory
