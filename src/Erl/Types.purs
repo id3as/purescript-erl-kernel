@@ -10,6 +10,8 @@ module Erl.Types
   , Octet(..)
   , PosInt
   , Ref
+  , SandboxedDir
+  , SandboxedFile
   , Second(..)
   , StrictlyMonotonicInt(..)
   , TimeOffset(..)
@@ -27,6 +29,8 @@ module Erl.Types
   ) where
 
 import Prelude
+
+import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Int (round, toNumber)
 import Data.Maybe (Maybe(..))
@@ -38,17 +42,17 @@ import Erl.Data.Binary (Binary)
 import Erl.Data.Tuple (Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8, tuple2, tuple3, tuple4, tuple5, tuple6, tuple7, tuple8, uncurry2, uncurry3, uncurry4, uncurry5, uncurry6, uncurry7, uncurry8)
 import Erl.Untagged.Union (class RuntimeType, RTInt)
 import Foreign (Foreign, unsafeToForeign)
+import Pathy (class IsDirOrFile, class IsRelOrAbs, Abs, Dir, File, Rel, SandboxedPath, posixPrinter, printPath)
 
-type NonNegInt
-  = Int
+type NonNegInt = Int
 
-type PosInt
-  = Int
+type PosInt = Int
 
 foreign import data Ref :: Type
 
 instance Show Ref where
   show = showRef
+
 instance Eq Ref where
   eq = eqRef
 
@@ -57,13 +61,13 @@ foreign import eqRef :: Ref -> Ref -> Boolean
 foreign import refToString :: Ref -> String
 foreign import stringToRef :: String -> Maybe Ref
 
-newtype Octet
-  = Octet Int
+newtype Octet = Octet Int
 
 derive instance Generic Octet _
 derive instance Eq Octet
 instance Show Octet where
   show = genericShow
+
 derive instance Newtype Octet _
 instance RuntimeType Octet RTInt
 
@@ -75,13 +79,13 @@ octet i
   | i >= 0, i <= 255 = Just $ Octet i
   | otherwise = Nothing
 
-newtype Hextet
-  = Hextet Int
+newtype Hextet = Hextet Int
 
 derive instance Eq Hextet
 derive instance Generic Hextet _
 instance Show Hextet where
   show = genericShow
+
 derive instance Newtype Hextet _
 instance RuntimeType Hextet RTInt
 
@@ -93,8 +97,10 @@ hextet i
   | i >= 0, i <= 65535 = Just $ Hextet i
   | otherwise = Nothing
 
-newtype MonotonicTime
-  = MonotonicTime Int
+type SandboxedDir = Either (SandboxedPath Abs Dir) (SandboxedPath Rel Dir)
+type SandboxedFile = Either (SandboxedPath Abs File) (SandboxedPath Rel File)
+
+newtype MonotonicTime = MonotonicTime Int
 
 derive instance Eq MonotonicTime
 derive newtype instance Ord MonotonicTime
@@ -103,8 +109,7 @@ derive instance Generic MonotonicTime _
 instance Show MonotonicTime where
   show = genericShow
 
-newtype NativeTime
-  = NativeTime Int
+newtype NativeTime = NativeTime Int
 
 derive instance Eq NativeTime
 derive newtype instance Ord NativeTime
@@ -113,28 +118,22 @@ derive instance Generic NativeTime _
 instance Show NativeTime where
   show = genericShow
 
-newtype TimeOffset
-  = TimeOffset Int
+newtype TimeOffset = TimeOffset Int
 
-newtype StrictlyMonotonicInt
-  = StrictlyMonotonicInt Int
+newtype StrictlyMonotonicInt = StrictlyMonotonicInt Int
 
 derive instance Eq StrictlyMonotonicInt
 derive newtype instance Ord StrictlyMonotonicInt
 
-newtype Second
-  = Second Int
+newtype Second = Second Int
 
 -- Use Data.Time.Duration.Milliseconds instead
 -- newtype Millisecond = Millisecond Int
-newtype Microsecond
-  = Microsecond Int
+newtype Microsecond = Microsecond Int
 
-newtype Nanosecond
-  = Nanosecond Int
+newtype Nanosecond = Nanosecond Int
 
-newtype FfiMilliseconds
-  = FfiMilliseconds Int
+newtype FfiMilliseconds = FfiMilliseconds Int
 
 toFfiMilliseconds :: Duration.Milliseconds -> FfiMilliseconds
 toFfiMilliseconds (Duration.Milliseconds ms) = FfiMilliseconds $ round ms
@@ -268,6 +267,17 @@ instance toErl_Boolean :: ToErl Boolean where
 
 instance toErl_Binary :: ToErl Binary where
   toErl = unsafeToForeign
+
+instance (IsRelOrAbs a, IsDirOrFile b) => ToErl (SandboxedPath a b) where
+  toErl = unsafeToForeign <<< printPath posixPrinter
+
+instance ToErl SandboxedFile where
+  toErl (Left abs) = toErl abs
+  toErl (Right rel) = toErl rel
+
+instance ToErl SandboxedDir where
+  toErl (Left abs) = toErl abs
+  toErl (Right rel) = toErl rel
 
 instance ToErl (Tuple2 Int Int) where
   toErl = unsafeToForeign

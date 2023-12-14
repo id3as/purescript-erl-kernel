@@ -31,6 +31,7 @@ module Erl.Kernel.Tcp
   ) where
 
 import Prelude
+
 import ConvertableOptions (class ConvertOption, class ConvertOptionsWithDefaults, convertOptionsWithDefaults)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
@@ -44,12 +45,12 @@ import Erl.Data.Binary (Binary)
 import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List)
 import Erl.Data.Tuple (tuple2)
-import Erl.Kernel.File (FileName)
 import Erl.Kernel.Inet (class OptionsValid, class Socket, ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError, ConnectedSocket, ListenSocket, PassiveSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
 import Foreign (Foreign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
+import Pathy (Abs, File, SandboxedPath)
 import Prim.Row as Row
 import Record as Record
 import Unsafe.Coerce (unsafeCoerce)
@@ -58,10 +59,13 @@ foreign import data TcpSocket :: SocketMessageBehaviour -> SocketType -> Type
 
 instance Eq (TcpSocket ActiveSocket ConnectedSocket) where
   eq = eqSocketImpl
+
 instance Eq (TcpSocket PassiveSocket ConnectedSocket) where
   eq = eqSocketImpl
+
 instance Eq (TcpSocket ActiveSocket ListenSocket) where
   eq = eqSocketImpl
+
 instance Eq (TcpSocket PassiveSocket ListenSocket) where
   eq = eqSocketImpl
 
@@ -69,10 +73,13 @@ foreign import eqSocketImpl :: forall socketMessageBehaviour socketType. TcpSock
 
 instance Show (TcpSocket ActiveSocket ConnectedSocket) where
   show = showSocketImpl
+
 instance Show (TcpSocket PassiveSocket ConnectedSocket) where
   show = showSocketImpl
+
 instance Show (TcpSocket ActiveSocket ListenSocket) where
   show = showSocketImpl
+
 instance Show (TcpSocket PassiveSocket ListenSocket) where
   show = showSocketImpl
 
@@ -82,6 +89,7 @@ instance Socket (TcpSocket ActiveSocket ConnectedSocket) where
   send = send
   recv = recv
   close = close
+
 instance Socket (TcpSocket PassiveSocket ConnectedSocket) where
   send = send
   recv = recv
@@ -159,61 +167,58 @@ instance toErl_SocketPacket :: ToErl SocketPacket where
   toErl Httph = unsafeToForeign $ atom "httph"
   toErl Httph_bin = unsafeToForeign $ atom "httph_bin"
 
-newtype Linger
-  = Linger NonNegInt
+newtype Linger = Linger NonNegInt
 
 derive newtype instance eqLinger :: Eq Linger
 
 instance toErl :: ToErl Linger where
   toErl (Linger linger) = unsafeToForeign $ tuple2 true linger
 
-type Options r
-  = CommonOptions
-      ( delay_send :: Maybe Boolean
-      , exit_on_close :: Maybe Boolean
-      , high_watermark :: Maybe NonNegInt
-      , keepalive :: Maybe Boolean
-      , linger :: Maybe Linger
-      , low_watermark :: Maybe NonNegInt
-      , nodelay :: Maybe Boolean
-      , packet :: Maybe SocketPacket
-      , packet_size :: Maybe NonNegInt
-      , send_timeout :: Maybe Milliseconds
-      , send_timeout_close :: Maybe Boolean
-      , show_econnreset :: Maybe Boolean
-      | r
-      )
+type Options r = CommonOptions
+  ( delay_send :: Maybe Boolean
+  , exit_on_close :: Maybe Boolean
+  , high_watermark :: Maybe NonNegInt
+  , keepalive :: Maybe Boolean
+  , linger :: Maybe Linger
+  , low_watermark :: Maybe NonNegInt
+  , nodelay :: Maybe Boolean
+  , packet :: Maybe SocketPacket
+  , packet_size :: Maybe NonNegInt
+  , send_timeout :: Maybe Milliseconds
+  , send_timeout_close :: Maybe Boolean
+  , show_econnreset :: Maybe Boolean
+  | r
+  )
 
-type ConnectListenOptions r
-  = Options
-      ( ip :: Maybe SocketAddress
-      , fd :: Maybe NonNegInt -- todo
-      , ifaddr :: Maybe SocketAddress
-      , family :: Maybe AddressFamily
-      , port :: Maybe Port
-      , netns :: Maybe FileName
-      , bind_to_device :: Maybe Binary
-      | r
-      )
+type ConnectListenOptions r = Options
+  ( ip :: Maybe SocketAddress
+  , fd :: Maybe NonNegInt -- todo
+  , ifaddr :: Maybe SocketAddress
+  , family :: Maybe AddressFamily
+  , port :: Maybe Port
+  , netns :: Maybe (SandboxedPath Abs File)
+  , bind_to_device :: Maybe Binary
+  | r
+  )
 
-type ConnectOptions
-  = ConnectListenOptions ()
+type ConnectOptions = ConnectListenOptions ()
 
-connectOptions ::
-  forall options.
-  ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) options (Record ConnectOptions) =>
-  options -> Record ConnectOptions
+connectOptions
+  :: forall options
+   . ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) options (Record ConnectOptions)
+  => options
+  -> Record ConnectOptions
 connectOptions options = convertOptionsWithDefaults OptionToMaybe defaultConnectOptions options
 
-type ListenOptions
-  = ConnectListenOptions
-      ( backlog :: Maybe (NonNegInt)
-      )
+type ListenOptions = ConnectListenOptions
+  ( backlog :: Maybe (NonNegInt)
+  )
 
-listenOptions ::
-  forall options.
-  ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) options (Record ListenOptions) =>
-  options -> Record ListenOptions
+listenOptions
+  :: forall options
+   . ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) options (Record ListenOptions)
+  => options
+  -> Record ListenOptions
 listenOptions options = convertOptionsWithDefaults OptionToMaybe defaultListenOptions options
 
 data TcpMessage
@@ -241,10 +246,11 @@ instance runtimeTypeTcpMessage ::
         )
     )
 
-defaultOptions ::
-  forall r.
-  Row.Union r (Options ()) (Options r) =>
-  Record r -> Record (Options r)
+defaultOptions
+  :: forall r
+   . Row.Union r (Options ()) (Options r)
+  => Record r
+  -> Record (Options r)
 defaultOptions r =
   Record.union r
     $ defaultCommonOptions
@@ -262,10 +268,11 @@ defaultOptions r =
         , show_econnreset: Nothing
         }
 
-defaultConnectListenOptions ::
-  forall r.
-  Row.Union r (ConnectListenOptions ()) (ConnectListenOptions r) =>
-  Record r -> Record (ConnectListenOptions r)
+defaultConnectListenOptions
+  :: forall r
+   . Row.Union r (ConnectListenOptions ()) (ConnectListenOptions r)
+  => Record r
+  -> Record (ConnectListenOptions r)
 defaultConnectListenOptions r =
   Record.union r
     $ defaultOptions
@@ -287,18 +294,17 @@ defaultListenOptions =
     { backlog: Nothing
     }
 
-type ForcedOptions r
-  = ( mode :: SocketMode
-    | r
-    )
+type ForcedOptions r =
+  ( mode :: SocketMode
+  | r
+  )
 
 forcedOptions :: Record (ForcedOptions ())
 forcedOptions =
   { mode: BinaryData
   }
 
-data OptionToMaybe
-  = OptionToMaybe
+data OptionToMaybe = OptionToMaybe
 
 instance convertOption_OptionToMaybeMode :: ConvertOption OptionToMaybe "mode" a a where
   convertOption _ _ val = val
@@ -307,35 +313,42 @@ else instance convertOption_OptionToMaybe :: ConvertOption OptionToMaybe sym (Ma
 else instance convertOption_OptionToMaybe2 :: ConvertOption OptionToMaybe sym a (Maybe a) where
   convertOption _ _ val = Just val
 
-convertPassiveToActive ::
-  forall m.
-  MonadEffect m =>
-  CanReceiveMessage TcpMessage m =>
-  TcpSocket PassiveSocket ConnectedSocket -> TcpSocket ActiveSocket ConnectedSocket
+convertPassiveToActive
+  :: forall m
+   . MonadEffect m
+  => CanReceiveMessage TcpMessage m
+  => TcpSocket PassiveSocket ConnectedSocket
+  -> TcpSocket ActiveSocket ConnectedSocket
 convertPassiveToActive = unsafeCoerce
 
-accept ::
-  forall m.
-  MonadEffect m =>
-  CanReceiveMessage TcpMessage m =>
-  TcpSocket ActiveSocket ListenSocket -> Timeout -> m (Either AcceptError (TcpSocket ActiveSocket ConnectedSocket))
+accept
+  :: forall m
+   . MonadEffect m
+  => CanReceiveMessage TcpMessage m
+  => TcpSocket ActiveSocket ListenSocket
+  -> Timeout
+  -> m (Either AcceptError (TcpSocket ActiveSocket ConnectedSocket))
 accept socket timeout = liftEffect $ acceptImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< acceptErrorToPurs) Right socket (toErl timeout)
 
-acceptPassive ::
-  TcpSocket PassiveSocket ListenSocket -> Timeout -> Effect (Either AcceptError (TcpSocket PassiveSocket ConnectedSocket))
+acceptPassive
+  :: TcpSocket PassiveSocket ListenSocket -> Timeout -> Effect (Either AcceptError (TcpSocket PassiveSocket ConnectedSocket))
 acceptPassive socket timeout = liftEffect $ acceptImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< acceptErrorToPurs) Right socket (toErl timeout)
 
 close :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> Effect Unit
 close = closeImpl
 
-connect ::
-  forall options m.
-  MonadEffect m =>
-  CanReceiveMessage TcpMessage m =>
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions)) =>
-  ConnectAddress -> Port -> Record options -> Timeout -> m (Either ConnectError (TcpSocket ActiveSocket ConnectedSocket))
+connect
+  :: forall options m
+   . MonadEffect m
+  => CanReceiveMessage TcpMessage m
+  => Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions))
+  => ConnectAddress
+  -> Port
+  -> Record options
+  -> Timeout
+  -> m (Either ConnectError (TcpSocket ActiveSocket ConnectedSocket))
 connect address port options timeout = do
   let
     addressErl = toErl address
@@ -343,13 +356,17 @@ connect address port options timeout = do
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultConnectOptions forced
   liftEffect $ connectImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< connectErrorToPurs) Right addressErl port optionsErl (toErl timeout)
 
-connectPassive ::
-  forall options.
-  Row.Lacks "active" options =>
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions)) =>
-  ConnectAddress -> Port -> Record options -> Timeout -> Effect (Either ConnectError (TcpSocket PassiveSocket ConnectedSocket))
+connectPassive
+  :: forall options
+   . Row.Lacks "active" options
+  => Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions))
+  => ConnectAddress
+  -> Port
+  -> Record options
+  -> Timeout
+  -> Effect (Either ConnectError (TcpSocket PassiveSocket ConnectedSocket))
 connectPassive address port options timeout = do
   let
     addressErl = toErl address
@@ -358,25 +375,29 @@ connectPassive address port options timeout = do
     optionsErl = optionsToErl merged { active = Just Passive }
   liftEffect $ connectImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< connectErrorToPurs) Right addressErl port optionsErl (toErl timeout)
 
-listen ::
-  forall options.
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ListenOptions)) =>
-  Port -> Record options -> Effect (Either ListenError (TcpSocket ActiveSocket ListenSocket))
+listen
+  :: forall options
+   . Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ListenOptions))
+  => Port
+  -> Record options
+  -> Effect (Either ListenError (TcpSocket ActiveSocket ListenSocket))
 listen port options = do
   let
     forced = Record.disjointUnion forcedOptions options
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultListenOptions forced
   listenImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< listenErrorToPurs) Right port optionsErl
 
-listenPassive ::
-  forall options.
-  Row.Lacks "active" options =>
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ListenOptions)) =>
-  Port -> Record options -> Effect (Either ListenError (TcpSocket PassiveSocket ListenSocket))
+listenPassive
+  :: forall options
+   . Row.Lacks "active" options
+  => Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ListenOptions))
+  => Port
+  -> Record options
+  -> Effect (Either ListenError (TcpSocket PassiveSocket ListenSocket))
 listenPassive port options = do
   let
     forced = Record.disjointUnion forcedOptions options
@@ -393,13 +414,15 @@ send = sendImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< 
 shutdown :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> ShutdownHow -> Effect (Either PosixError Unit)
 shutdown = shutdownImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< posixErrorToPurs) Right
 
-setopts ::
-  forall options socketMessageBehaviour socketType.
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record (Options ())) (Record (ForcedOptions options)) (Record (ForcedOptions (Options ()))) =>
-  OptionsValid socketMessageBehaviour options =>
-  TcpSocket socketMessageBehaviour socketType -> Record options -> Effect (Either PosixError Unit)
+setopts
+  :: forall options socketMessageBehaviour socketType
+   . Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record (Options ())) (Record (ForcedOptions options)) (Record (ForcedOptions (Options ())))
+  => OptionsValid socketMessageBehaviour options
+  => TcpSocket socketMessageBehaviour socketType
+  -> Record options
+  -> Effect (Either PosixError Unit)
 setopts socket options = do
   let
     forced = Record.disjointUnion forcedOptions options
@@ -407,68 +430,69 @@ setopts socket options = do
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe (defaultOptions {}) forced
   liftEffect $ setoptsImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< posixErrorToPurs) Right socket optionsErl
 
-foreign import acceptImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
-  ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
-  TcpSocket socketMessageBehaviour ListenSocket ->
-  Foreign ->
-  Effect (Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket))
+foreign import acceptImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket))
+  -> ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket))
+  -> TcpSocket socketMessageBehaviour ListenSocket
+  -> Foreign
+  -> Effect (Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket))
 
-foreign import closeImpl ::
-  forall socketMessageBehaviour socketType.
-  TcpSocket socketMessageBehaviour socketType -> Effect Unit
+foreign import closeImpl
+  :: forall socketMessageBehaviour socketType
+   . TcpSocket socketMessageBehaviour socketType
+  -> Effect Unit
 
-foreign import connectImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
-  ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
-  Foreign ->
-  Port ->
-  List Foreign ->
-  Foreign ->
-  Effect (Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket))
+foreign import connectImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket))
+  -> ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket))
+  -> Foreign
+  -> Port
+  -> List Foreign
+  -> Foreign
+  -> Effect (Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket))
 
-foreign import listenImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket)) ->
-  ((TcpSocket socketMessageBehaviour ListenSocket) -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket)) ->
-  Port ->
-  List Foreign ->
-  Effect (Either ListenError (TcpSocket socketMessageBehaviour ListenSocket))
+foreign import listenImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket))
+  -> ((TcpSocket socketMessageBehaviour ListenSocket) -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket))
+  -> Port
+  -> List Foreign
+  -> Effect (Either ListenError (TcpSocket socketMessageBehaviour ListenSocket))
 
-foreign import recvImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either ActiveError Binary) ->
-  (Binary -> Either ActiveError Binary) ->
-  TcpSocket socketMessageBehaviour ConnectedSocket ->
-  NonNegInt ->
-  Foreign ->
-  Effect (Either ActiveError Binary)
+foreign import recvImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either ActiveError Binary)
+  -> (Binary -> Either ActiveError Binary)
+  -> TcpSocket socketMessageBehaviour ConnectedSocket
+  -> NonNegInt
+  -> Foreign
+  -> Effect (Either ActiveError Binary)
 
-foreign import sendImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either SendError Unit) ->
-  (Unit -> Either SendError Unit) ->
-  TcpSocket socketMessageBehaviour ConnectedSocket ->
-  IOData ->
-  Effect (Either SendError Unit)
+foreign import sendImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either SendError Unit)
+  -> (Unit -> Either SendError Unit)
+  -> TcpSocket socketMessageBehaviour ConnectedSocket
+  -> IOData
+  -> Effect (Either SendError Unit)
 
-foreign import shutdownImpl ::
-  forall socketMessageBehaviour socketType.
-  (Foreign -> Either PosixError Unit) ->
-  (Unit -> Either PosixError Unit) ->
-  TcpSocket socketMessageBehaviour socketType ->
-  ShutdownHow ->
-  Effect (Either PosixError Unit)
+foreign import shutdownImpl
+  :: forall socketMessageBehaviour socketType
+   . (Foreign -> Either PosixError Unit)
+  -> (Unit -> Either PosixError Unit)
+  -> TcpSocket socketMessageBehaviour socketType
+  -> ShutdownHow
+  -> Effect (Either PosixError Unit)
 
-foreign import setoptsImpl ::
-  forall socketMessageBehaviour socketType.
-  (Foreign -> Either PosixError Unit) ->
-  (Unit -> Either PosixError Unit) ->
-  TcpSocket socketMessageBehaviour socketType ->
-  List Foreign ->
-  Effect (Either PosixError Unit)
+foreign import setoptsImpl
+  :: forall socketMessageBehaviour socketType
+   . (Foreign -> Either PosixError Unit)
+  -> (Unit -> Either PosixError Unit)
+  -> TcpSocket socketMessageBehaviour socketType
+  -> List Foreign
+  -> Effect (Either PosixError Unit)
 
 foreign import acceptErrorToPursImpl :: (Foreign -> Maybe AcceptError) -> Foreign -> Maybe AcceptError
 

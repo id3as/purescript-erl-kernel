@@ -13,4 +13,4 @@ clean:
 distclean: clean
 	rm -rf .spago
 test: 
-	@spago -x test.dhall test
+	@spago test

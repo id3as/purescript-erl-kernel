@@ -1,0 +1,84 @@
+package:
+  dependencies:
+    - convertable-options
+    - datetime
+    - effect
+    - either
+    - erl-atom
+    - erl-binary
+    - erl-lists
+    - erl-maps
+    - erl-modules
+    - erl-process
+    - erl-tuples
+    - erl-untagged-union
+    - foldable-traversable
+    - foreign
+    - functions
+    - integers
+    - maybe
+    - newtype
+    - partial
+    - pathy
+    - prelude
+    - record
+    - typelevel-prelude
+    - unsafe-coerce
+  name: erl-kernel
+  test:
+    dependencies:
+      - assert
+      - erl-test-eunit
+      - free
+      - prelude
+    main: Test.Main
+workspace:
+  backend:
+    cmd: purerl
+  extra_packages:
+    convertable-options:
+      dependencies:
+        - effect
+        - maybe
+        - record
+      git: https://github.com/natefaubion/purescript-convertable-options
+      ref: f20235d464e8767c469c3804cf6bec4501f970e6
+    erl-binary:
+      dependencies:
+        - erl-lists
+        - maybe
+        - prelude
+      git: https://github.com/id3as/purescript-erl-binary.git
+      ref: e3a5da78a9264a800eb7bad918a58de5ac57ba4c
+    erl-process:
+      dependencies:
+        - datetime
+        - effect
+        - either
+        - foreign
+        - integers
+        - prelude
+      git: https://github.com/id3as/purescript-erl-process.git
+      ref: 67787f787d3f6a0523f931e651156ec82709e7f1
+    erl-untagged-union:
+      dependencies:
+        - erl-atom
+        - erl-binary
+        - erl-lists
+        - erl-tuples
+        - foreign
+        - maybe
+        - partial
+        - prelude
+        - typelevel-prelude
+        - unsafe-coerce
+      git: https://github.com/id3as/purescript-erl-untagged-union.git
+      ref: 781b2894f9ffcc91b7aea482e435bb9284596f62
+    pathy:
+      ref: c23c7b772c37bc499503ea63867287200fa44966
+      git: https://github.com/id3as/purescript-pathy.git
+      dependencies:
+        - prelude
+  package_set:
+    url: https://raw.githubusercontent.com/purerl/package-sets/erl-0.15.3-20220629/packages.json
+    hash: sha256-kLmZv2u5dWVUUaQEwK0b3T1Ghce5a/hG0zlizaYfcXs=

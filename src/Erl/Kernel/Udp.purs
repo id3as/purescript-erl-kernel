@@ -20,6 +20,7 @@ module Erl.Kernel.Udp
   ) where
 
 import Prelude
+
 import ConvertableOptions (class ConvertOption, class ConvertOptionsWithDefaults, convertOptionsWithDefaults)
 import Data.Either (Either(..))
 import Data.Function.Uncurried (Fn3, Fn4, mkFn3, mkFn4)
@@ -32,12 +33,12 @@ import Erl.Data.Binary (Binary)
 import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List)
 import Erl.Data.Tuple (Tuple2)
-import Erl.Kernel.File (FileName)
 import Erl.Kernel.Inet (class OptionsValid, AddressFamily, ActiveSocket, PassiveSocket, CommonOptions, HostAddress, IpAddress, IpAddressUnion, Port, PosixError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), defaultCommonOptions, optionsToErl, posixErrorToPurs)
 import Erl.Types (NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTInt, RTLiteralAtom, RTLiteralAtomConvert, RTOption, RTTuple2, RTTuple5, RTTuple6, RTWildcard)
 import Foreign (Foreign)
 import Partial.Unsafe (unsafeCrashWith)
+import Pathy (Abs, File, SandboxedPath)
 import Prim.Row as Row
 import Record as Record
 import Unsafe.Coerce (unsafeCoerce)
@@ -46,6 +47,7 @@ foreign import data UdpSocket :: SocketMessageBehaviour -> Type
 
 instance Eq (UdpSocket ActiveSocket) where
   eq = eqSocketImpl
+
 instance Eq (UdpSocket PassiveSocket) where
   eq = eqSocketImpl
 
@@ -53,8 +55,10 @@ foreign import eqSocketImpl :: forall socketMessageBehaviour. UdpSocket socketMe
 
 instance Show (UdpSocket ActiveSocket) where
   show = showSocketImpl
+
 instance Show (UdpSocket PassiveSocket) where
   show = showSocketImpl
+
 foreign import showSocketImpl :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> String
 
 data UdpAncillary
@@ -148,22 +152,22 @@ instance show_ReceiveError :: Show ReceiveError where
 receiveErrorToPurs :: Foreign -> Maybe ReceiveError
 receiveErrorToPurs f = receiveErrorToPursImpl ((map ReceivePosix) <<< posixErrorToPurs) f
 
-type Options r
-  = CommonOptions
-      ( add_membership :: Maybe (Tuple2 IpAddress IpAddress)
-      , broadcast :: Maybe Boolean
-      , drop_membership :: Maybe (Tuple2 IpAddress IpAddress)
-      , multicast_if :: Maybe IpAddress
-      , multicast_loop :: Maybe Boolean
-      , multicast_ttl :: Maybe NonNegInt
-      , read_packets :: Maybe NonNegInt
-      | r
-      )
+type Options r = CommonOptions
+  ( add_membership :: Maybe (Tuple2 IpAddress IpAddress)
+  , broadcast :: Maybe Boolean
+  , drop_membership :: Maybe (Tuple2 IpAddress IpAddress)
+  , multicast_if :: Maybe IpAddress
+  , multicast_loop :: Maybe Boolean
+  , multicast_ttl :: Maybe NonNegInt
+  , read_packets :: Maybe NonNegInt
+  | r
+  )
 
-defaultOptions ::
-  forall r.
-  Row.Union r (Options ()) (Options r) =>
-  Record r -> Record (Options r)
+defaultOptions
+  :: forall r
+   . Row.Union r (Options ()) (Options r)
+  => Record r
+  -> Record (Options r)
 defaultOptions
   r =
   Record.union r
@@ -177,16 +181,15 @@ defaultOptions
         , read_packets: Nothing
         }
 
-type OpenOptions
-  = Options
-      ( ip :: Maybe SocketAddress
-      , fd :: Maybe NonNegInt -- todo
-      , ifaddr :: Maybe SocketAddress
-      , family :: Maybe AddressFamily
-      , port :: Maybe Port
-      , netns :: Maybe FileName
-      , bind_to_device :: Maybe Binary
-      )
+type OpenOptions = Options
+  ( ip :: Maybe SocketAddress
+  , fd :: Maybe NonNegInt -- todo
+  , ifaddr :: Maybe SocketAddress
+  , family :: Maybe AddressFamily
+  , port :: Maybe Port
+  , netns :: Maybe (SandboxedPath Abs File)
+  , bind_to_device :: Maybe Binary
+  )
 
 defaultOpenOptions :: Record OpenOptions
 defaultOpenOptions =
@@ -200,18 +203,17 @@ defaultOpenOptions =
     , bind_to_device: Nothing
     }
 
-type ForcedOptions r
-  = ( mode :: SocketMode
-    | r
-    )
+type ForcedOptions r =
+  ( mode :: SocketMode
+  | r
+  )
 
 forcedOptions :: Record (ForcedOptions ())
 forcedOptions =
   { mode: BinaryData
   }
 
-data OptionToMaybe
-  = OptionToMaybe
+data OptionToMaybe = OptionToMaybe
 
 instance ConvertOption OptionToMaybe "mode" a a where
   convertOption _ _ val = val
@@ -220,34 +222,39 @@ else instance ConvertOption OptionToMaybe sym (Maybe a) (Maybe a) where
 else instance ConvertOption OptionToMaybe sym a (Maybe a) where
   convertOption _ _ val = Just val
 
-convertPassiveToActive ::
-  forall m.
-  MonadEffect m =>
-  CanReceiveMessage UdpMessage m =>
-  UdpSocket PassiveSocket -> UdpSocket ActiveSocket
+convertPassiveToActive
+  :: forall m
+   . MonadEffect m
+  => CanReceiveMessage UdpMessage m
+  => UdpSocket PassiveSocket
+  -> UdpSocket ActiveSocket
 convertPassiveToActive = unsafeCoerce
 
-open ::
-  forall options m.
-  MonadEffect m =>
-  CanReceiveMessage UdpMessage m =>
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions)) =>
-  Port -> Record options -> m (Either OpenError (UdpSocket ActiveSocket))
+open
+  :: forall options m
+   . MonadEffect m
+  => CanReceiveMessage UdpMessage m
+  => Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions))
+  => Port
+  -> Record options
+  -> m (Either OpenError (UdpSocket ActiveSocket))
 open port' options = do
   let
     forced = Record.disjointUnion forcedOptions options
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultOpenOptions forced
   liftEffect $ openImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< openErrorToPurs) Right port' optionsErl
 
-openPassive ::
-  forall options.
-  Row.Lacks "active" options =>
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions)) =>
-  Port -> Record options -> Effect (Either OpenError (UdpSocket PassiveSocket))
+openPassive
+  :: forall options
+   . Row.Lacks "active" options
+  => Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions))
+  => Port
+  -> Record options
+  -> Effect (Either OpenError (UdpSocket PassiveSocket))
 openPassive port' options = do
   let
     forced = Record.disjointUnion forcedOptions options
@@ -271,57 +278,59 @@ close = closeImpl
 port :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect (Maybe Port)
 port = portImpl
 
-setopts ::
-  forall options socketMessageBehaviour.
-  Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
-  Row.Nub (ForcedOptions options) (ForcedOptions options) =>
-  ConvertOptionsWithDefaults OptionToMaybe (Record (Options ())) (Record (ForcedOptions options)) (Record (ForcedOptions (Options ()))) =>
-  OptionsValid socketMessageBehaviour options =>
-  UdpSocket socketMessageBehaviour -> Record options -> Effect (Either PosixError Unit)
+setopts
+  :: forall options socketMessageBehaviour
+   . Row.Union (ForcedOptions ()) options (ForcedOptions options)
+  => Row.Nub (ForcedOptions options) (ForcedOptions options)
+  => ConvertOptionsWithDefaults OptionToMaybe (Record (Options ())) (Record (ForcedOptions options)) (Record (ForcedOptions (Options ())))
+  => OptionsValid socketMessageBehaviour options
+  => UdpSocket socketMessageBehaviour
+  -> Record options
+  -> Effect (Either PosixError Unit)
 setopts socket options = do
   let
     forced = Record.disjointUnion forcedOptions options
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe (defaultOptions {}) forced
   liftEffect $ setoptsImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< posixErrorToPurs) Right socket optionsErl
 
-foreign import openImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either OpenError (UdpSocket socketMessageBehaviour)) ->
-  (UdpSocket socketMessageBehaviour -> Either OpenError (UdpSocket socketMessageBehaviour)) ->
-  Port ->
-  List Foreign ->
-  Effect (Either OpenError (UdpSocket socketMessageBehaviour))
+foreign import openImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either OpenError (UdpSocket socketMessageBehaviour))
+  -> (UdpSocket socketMessageBehaviour -> Either OpenError (UdpSocket socketMessageBehaviour))
+  -> Port
+  -> List Foreign
+  -> Effect (Either OpenError (UdpSocket socketMessageBehaviour))
 
-foreign import sendImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either SendError Unit) ->
-  (Unit -> Either SendError Unit) ->
-  UdpSocket socketMessageBehaviour ->
-  Foreign ->
-  Port ->
-  IOData ->
-  Effect (Either SendError Unit)
+foreign import sendImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either SendError Unit)
+  -> (Unit -> Either SendError Unit)
+  -> UdpSocket socketMessageBehaviour
+  -> Foreign
+  -> Port
+  -> IOData
+  -> Effect (Either SendError Unit)
 
-foreign import recvImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either ReceiveError UdpRecvData) ->
-  Fn3 IpAddressUnion Port Binary (Either ReceiveError UdpRecvData) ->
-  Fn4 IpAddressUnion Port (List UdpAncillary) Binary (Either ReceiveError UdpRecvData) ->
-  UdpSocket socketMessageBehaviour ->
-  Foreign ->
-  Effect (Either ReceiveError UdpRecvData)
+foreign import recvImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either ReceiveError UdpRecvData)
+  -> Fn3 IpAddressUnion Port Binary (Either ReceiveError UdpRecvData)
+  -> Fn4 IpAddressUnion Port (List UdpAncillary) Binary (Either ReceiveError UdpRecvData)
+  -> UdpSocket socketMessageBehaviour
+  -> Foreign
+  -> Effect (Either ReceiveError UdpRecvData)
 
 foreign import closeImpl :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect Unit
 
 foreign import portImpl :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect (Maybe Port)
 
-foreign import setoptsImpl ::
-  forall socketMessageBehaviour.
-  (Foreign -> Either PosixError Unit) ->
-  (Unit -> Either PosixError Unit) ->
-  UdpSocket socketMessageBehaviour ->
-  List Foreign ->
-  Effect (Either PosixError Unit)
+foreign import setoptsImpl
+  :: forall socketMessageBehaviour
+   . (Foreign -> Either PosixError Unit)
+  -> (Unit -> Either PosixError Unit)
+  -> UdpSocket socketMessageBehaviour
+  -> List Foreign
+  -> Effect (Either PosixError Unit)
 
 foreign import openErrorToPursImpl :: (Foreign -> Maybe OpenError) -> Foreign -> Maybe OpenError
 foreign import sendErrorToPursImpl :: (Foreign -> Maybe SendError) -> Foreign -> Maybe SendError

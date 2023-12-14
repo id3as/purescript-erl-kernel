@@ -3,7 +3,6 @@
 -export([
          openImpl/3,
          readImpl/2,
-         unsafeRead/2,
          readFileImpl/3,
          writeImpl/4,
          writeFileImpl/4,
@@ -12,14 +11,12 @@
          seekImpl/5,
          copyImpl/5,
          deleteImpl/3,
-         join/2,
-         posixErrorToPurs/1,
          cwdImpl/2,
-         isDir/1
+         listDirImpl/3,
+         posixErrorToPurs/1,
+         fileErrorToPurs/1,
+         unsafeRead/2
         ]).
-
-join(Left, Right) ->
-  filename:join(Left, Right).
 
 openImpl(Left, Right, DefaultOptions) ->
       fun(FileName) ->
@@ -107,13 +104,15 @@ openImpl(Left, Right, DefaultOptions) ->
 
 readImpl(Handle, Amount) ->
   fun() ->
-      unsafeRead(Handle, Amount)
+    unsafeRead(Handle, Amount)
   end.
 
+%% This function exists and is exported since it is known about by the purerl optimiser to 
+%% enable it to remove the thunk around `readImpl`
 unsafeRead(Handle, Amount) ->
   case file:read(Handle, Amount) of
     {ok, Data} ->
-          {right, Data};
+       {right, Data};
     eof ->
       {left, fileErrorToPurs(eof)};
     {error, Err} ->
@@ -208,14 +207,29 @@ copyImpl(Left, Right, Handle1, Handle2, Amount) ->
 cwdImpl(Left, Right) ->
   fun() ->
       case file:get_cwd() of
-        {ok, Cwd} -> Right(list_to_binary(Cwd));
+        {ok, Cwd} -> Right(<<(unicode:characters_to_binary(Cwd))/binary, "/">>);
         {error, Err} -> Left(fileErrorToPurs(Err))
       end
   end.
 
-isDir(Dir) ->
+listDirImpl(Left, Right, Dir) ->
   fun() ->
-      filelib:is_dir(Dir)
+    Result = file:list_dir(Dir),
+    case Result of
+      {ok, Names} -> 
+        Right(
+          lists:map(fun(Name) ->
+            Bin = unicode:characters_to_binary(Name),
+            case filelib:is_dir(Name) of
+              true -> {left, <<Bin/binary, "/">>};
+              false -> {right, Bin}
+            end
+          end,
+          Names)
+        );
+
+      {error, Err} -> Left(fileErrorToPurs(Err))
+    end
   end.
 
 posixErrorToPurs(eacces) -> {just, {eAcces}};

@@ -3,7 +3,7 @@ module Test.Main where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Either (Either(..), fromRight')
+import Data.Either (Either(..), fromRight', isRight)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromMaybe', isNothing)
 import Data.Show.Generic (genericShow)
@@ -15,6 +15,7 @@ import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
+import Erl.Kernel.File (listDir)
 import Erl.Kernel.Inet (ActiveError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
@@ -26,7 +27,9 @@ import Erl.Types (Hextet(..), Octet(..), Timeout(..))
 import Erl.Untagged.Union (class RuntimeType, type (|$|), type (|+|), Nil, RTLiteralAtom, RTOption, RTTuple1, Union, inj, prj)
 import Foreign (unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
+import Pathy (dir, rootDir, sandbox, (</>))
 import Test.Assert (assert', assertEqual, assertTrue)
+import Type.Prelude (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 main :: Effect Unit
@@ -37,20 +40,27 @@ main =
         udpTests
         ipTests
         exceptionTests
+        fileTests
 
-data Msg
-  = Ready
+data Msg = Ready
 
 derive instance eqMsg :: Eq Msg
 derive instance genericMsg :: Generic Msg _
 instance showMsg :: Show Msg where
   show = genericShow
+
 instance runtimeTypeMsg :: RuntimeType Msg (RTOption (RTTuple1 (RTLiteralAtom "ready")) (RTTuple1 (RTLiteralAtom "accepted")))
 
-type ClientUnion
-  = Union |$| Msg |+| TcpMessage |+| Nil
-type ServerUnion
-  = Union |$| TcpMessage |+| Nil
+type ClientUnion = Union |$| Msg |+| TcpMessage |+| Nil
+
+type ServerUnion = Union |$| TcpMessage |+| Nil
+
+fileTests :: Free TestF Unit
+fileTests = do
+  suite "file tests" do
+    test "can list tmp" $ liftEffect do
+      res <- listDir $ Left $ unsafeFromJust "impossible" $ sandbox rootDir $ rootDir </> dir (Proxy :: _ "tmp")
+      assertTrue $ isRight res
 
 tcpTests :: Free TestF Unit
 tcpTests = do
@@ -168,8 +178,8 @@ udpTests = do
                     { actual: message
                     , expected: inj $ Udp socket1 (inj ip4Loopback) port2 (toBinary "hello")
                     }
-          ) ::
-            ProcessM (Union |$| UdpMessage |+| Nil) Unit
+          )
+            :: ProcessM (Union |$| UdpMessage |+| Nil) Unit
         )
     test "Active socket in passive mode test" do
       unsafeRunProcessM
@@ -185,8 +195,8 @@ udpTests = do
                         Udp.Data _ _ p -> Just p
                         Udp.DataAnc _ _ _ _ -> Nothing
                     assertTrue $ payload == (Just $ toBinary "hello")
-          ) ::
-            ProcessM (Union |$| UdpMessage |+| Nil) Unit
+          )
+            :: ProcessM (Union |$| UdpMessage |+| Nil) Unit
         )
     test "passive socket test" do
       socket1 <- unsafeFromRight "open failed" <$> Udp.openPassive (Port 8888) { reuseaddr: true }
@@ -214,8 +224,8 @@ udpTests = do
                         Udp.Data _ _ p -> Just p
                         Udp.DataAnc _ _ _ _ -> Nothing
                     assertTrue $ payload == (Just $ toBinary "hello")
-          ) ::
-            ProcessM (Union |$| UdpMessage |+| Nil) Unit
+          )
+            :: ProcessM (Union |$| UdpMessage |+| Nil) Unit
         )
   test "show binary short string" do
     let
@@ -377,13 +387,13 @@ exceptionTests = do
           Left reason | isMyError reason -> pure unit
           _ -> assert' "not my error" false
 
-    test "tryNamedError" do 
+    test "tryNamedError" do
       tryNamedError (atom "some_error") (error $ unsafeToForeign $ atom "some_error") >>=
         assertTrue <<< isNothing
 
   where
   testValue = unsafeToForeign "my error"
-  isMyError reason = unsafeCoerce reason ==  "my error"
+  isMyError reason = unsafeCoerce reason == "my error"
 
 unsafeFromJust :: forall a. String -> Maybe a -> a
 unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
