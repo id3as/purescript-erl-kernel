@@ -6,6 +6,7 @@
          readFileImpl/3,
          writeImpl/4,
          writeFileImpl/4,
+         renameImpl/4,
          closeImpl/3,
          syncImpl/3,
          seekImpl/5,
@@ -127,6 +128,16 @@ readFileImpl(Left, Right, Filename) ->
         {error, Err} ->
           Left(fileErrorToPurs(Err))
       end
+  end.
+
+renameImpl(Left, Right, Source, Dest) ->
+  fun() ->
+    case file:rename(Source, Dest) of
+      ok ->
+        Right;
+      {error, Err} ->
+        Left(fileErrorToPurs(Err))
+    end
   end.
 
 writeImpl(Left, Right, Handle, Data) ->

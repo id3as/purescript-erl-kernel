@@ -11,6 +11,7 @@ module Erl.Kernel.File
   , open
   , read
   , readFile
+  , rename
   , write
   , writeFile
   , sync
@@ -156,6 +157,13 @@ foreign import writeFileImpl
   -> (Either FileError Unit)
   -> String
   -> IOData
+  -> Effect (Either FileError Unit)
+
+foreign import renameImpl
+  :: (FileError -> Either FileError Unit)
+  -> Either FileError Unit
+  -> String
+  -> String
   -> Effect (Either FileError Unit)
 
 foreign import closeImpl
@@ -306,6 +314,9 @@ writeFile = writeFileImpl Left (Right unit) <<< fileToString
 
 readFile :: SandboxedFile -> Effect (Either FileError Binary)
 readFile = readFileImpl Left Right <<< fileToString
+
+rename :: SandboxedFile -> SandboxedFile -> Effect (Either FileError Unit)
+rename source dest = renameImpl Left (Right unit) (fileToString source) (fileToString dest)
 
 seek :: FileHandle -> FilePositioning -> Int -> Effect (Either FileError Int)
 seek = seekImpl Left Right
