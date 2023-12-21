@@ -14,6 +14,8 @@
          deleteImpl/3,
          cwdImpl/2,
          listDirImpl/3,
+         delDirImpl/3,
+         delDirRImpl/3,
          posixErrorToPurs/1,
          fileErrorToPurs/1,
          unsafeRead/2
@@ -239,6 +241,22 @@ listDirImpl(Left, Right, Dir) ->
           Names)
         );
 
+      {error, Err} -> Left(fileErrorToPurs(Err))
+    end
+  end.
+
+delDirImpl(Left, Right, Dir) ->
+  fun() ->
+    case file:del_dir(Dir) of
+      ok -> Right;
+      {error, Err} -> Left(fileErrorToPurs(Err))
+    end
+  end.
+
+delDirRImpl(Left, Right, Dir) ->
+  fun() ->
+    case file:del_dir_r(Dir) of
+      ok -> Right;
       {error, Err} -> Left(fileErrorToPurs(Err))
     end
   end.

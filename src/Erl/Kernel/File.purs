@@ -28,6 +28,8 @@ module Erl.Kernel.File
   , dirToString
   , pathToString
   , fileExtension
+  , delDir
+  , delDirR
   ) where
 
 import Prelude hiding (join)
@@ -124,6 +126,18 @@ instance fileError_show :: Show FileError where
   show (Other _other) = "other"
 
 foreign import data FileHandle :: Type
+
+foreign import delDirImpl
+  :: (FileError -> Either FileError IOData)
+  -> (Either FileError Unit)
+  -> String
+  -> Effect (Either FileError Unit)
+
+foreign import delDirRImpl
+  :: (FileError -> Either FileError IOData)
+  -> (Either FileError Unit)
+  -> String
+  -> Effect (Either FileError Unit)
 
 foreign import openImpl
   :: forall options
@@ -293,6 +307,12 @@ open
   -> Effect (Either FileError FileHandle)
 open file opts =
   openImpl Left Right defaultFileOpenOptions (fileToString file) opts
+
+delDir :: SandboxedDir -> Effect (Either FileError Unit)
+delDir = delDirImpl Left (Right unit) <<< dirToString
+
+delDirR :: SandboxedDir -> Effect (Either FileError Unit)
+delDirR = delDirRImpl Left (Right unit) <<< dirToString
 
 read :: FileHandle -> Int -> Effect (Either FileError Binary)
 read = readImpl
