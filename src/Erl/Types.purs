@@ -118,7 +118,9 @@ derive instance Generic NativeTime _
 instance Show NativeTime where
   show = genericShow
 
-newtype TimeOffset = TimeOffset Int
+newtype TimeOffset = TimeOffset NativeTime
+
+derive instance Newtype TimeOffset _
 
 newtype StrictlyMonotonicInt = StrictlyMonotonicInt Int
 

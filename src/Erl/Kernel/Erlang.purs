@@ -21,6 +21,7 @@ module Erl.Kernel.Erlang
   , currentTimeOffset
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
+  , nativeTimeUnit
   , microsecondsToMilliseconds
   , millisecondsToNativeTime
   , uniqueInteger
@@ -82,6 +83,8 @@ monotonicTimeDelta :: MonotonicTime -> MonotonicTime -> NativeTime
 monotonicTimeDelta (MonotonicTime start) (MonotonicTime end) =
   NativeTime $ end - start
 
+foreign import nativeTimeUnit :: Int
+
 nativeTimeToMilliseconds :: NativeTime -> Milliseconds
 nativeTimeToMilliseconds (NativeTime t) =
   nativeTimeToMilliseconds_ t
@@ -99,7 +102,7 @@ millisecondsToNativeTime (Milliseconds t) =
 foreign import millisecondsToNativeTime_ :: Int -> NativeTime
 
 currentTimeOffset :: Effect TimeOffset
-currentTimeOffset = currentTimeOffset_ TimeOffset
+currentTimeOffset = currentTimeOffset_ (TimeOffset <<< NativeTime)
 
 foreign import currentTimeOffset_ :: (Int -> TimeOffset) -> Effect TimeOffset
 
@@ -133,7 +136,7 @@ foreign import cpuTopology :: Effect (List NumaNode)
 foreign import totalSystemMemory :: Effect (Maybe Int)
 
 monotonicTimeToInstant :: MonotonicTime -> TimeOffset -> Maybe Instant
-monotonicTimeToInstant (MonotonicTime t) (TimeOffset o) =
+monotonicTimeToInstant (MonotonicTime t) (TimeOffset (NativeTime o)) =
   instant $ nativeTimeToMilliseconds $ NativeTime $ t + o
 
 foreign import node :: Effect Atom

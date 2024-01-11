@@ -15,6 +15,7 @@
         , strictlyMonotonicInt_/1
         , currentTimeOffset_/1
         , nativeTimeToMilliseconds_/1
+        , nativeTimeUnit/0
         , millisecondsToNativeTime_/1
         , node/0
         , uniqueInteger_/1
@@ -76,6 +77,9 @@ monotonicStartTime_(Ctor) ->
 
 nativeTimeToMilliseconds_(Time) ->
   erlang:convert_time_unit(Time, native, microsecond) / 1000.
+
+nativeTimeUnit() ->
+  erlang:convert_time_unit(1, second, native).
 
 millisecondsToNativeTime_(Time) ->
   erlang:convert_time_unit(erlang:round(Time * 1000), microsecond, native).
