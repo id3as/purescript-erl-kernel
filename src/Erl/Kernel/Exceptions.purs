@@ -25,11 +25,11 @@ import Effect (Effect)
 import Erl.Atom (Atom)
 import Foreign (Foreign)
 
-foreign import throw :: Foreign -> Effect Unit
+foreign import throw :: forall a. Foreign -> Effect a
 
-foreign import error :: Foreign -> Effect Unit
+foreign import error :: forall a. Foreign -> Effect a
 
-foreign import exit :: Foreign -> Effect Unit
+foreign import exit :: forall a. Foreign -> Effect a
 
 data ErrorType 
   = Error
