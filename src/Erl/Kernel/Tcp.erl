@@ -32,9 +32,6 @@ closeImpl(Socket) ->
 
 connectImpl(Left, Right, Address, Port, Options, Timeout) ->
     fun() ->
-            io:format("~n~n~nAddress ~p~n~n~n", [Address]),
-            io:format("Port ~p~n", [Port]),
-            io:format("Timeout ~p~n", [Timeout]),
             Address2 = if is_binary(Address) -> binary_to_list(Address);
                        true -> Address
                     end,
