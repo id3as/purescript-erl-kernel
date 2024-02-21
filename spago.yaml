@@ -18,10 +18,12 @@ package:
     - integers
     - maybe
     - newtype
+    - ordered-collections
     - partial
     - pathy
     - prelude
     - record
+    - strings
     - typelevel-prelude
     - unsafe-coerce
   name: erl-kernel

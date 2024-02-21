@@ -22,9 +22,12 @@ You can edit this file as you like.
   , "integers"
   , "maybe"
   , "newtype"
+  , "ordered-collections"
   , "partial"
+  , "pathy"
   , "prelude"
   , "record"
+  , "strings"
   , "typelevel-prelude"
   , "unsafe-coerce"
   ]
