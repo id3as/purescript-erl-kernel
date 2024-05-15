@@ -2,6 +2,7 @@
 
 -export([ new/2
         , insert2/2
+        , insertNew2/2
         , insert3/2
         , updateCounter/3
         , increment/4
@@ -9,9 +10,13 @@
         , updateElement/4
         , updateElements/3
         , match/2
+        , matchObject/2
+        , matchDelete/2
         , select/2
+        , lookup/2
         , selectOp/2
         , selectOne/2
+        , toList/1
         , delete/1
         , delete2/2
         ]).
@@ -24,6 +29,11 @@ new(Name, Options) ->
 insert2(Table, Tuple) ->
   fun() ->
       ets:insert(Table, Tuple)
+  end.
+
+insertNew2(Table, Tuple) ->
+  fun() ->
+      ets:insert_new(Table, Tuple)
   end.
 
 insert3(Table, Tuple) ->
@@ -67,10 +77,25 @@ match(Table, Spec) ->
       lists:map(fun(I) -> list_to_tuple(I) end, ets:match(Table, Spec))
   end.
 
+matchObject(Table, Spec) ->
+  fun() ->
+      ets:match_object(Table, Spec)
+  end.
+
+matchDelete(Table, Spec) ->
+  fun() ->
+      ets:match_delete(Table, Spec)
+  end.
+
 
 select(Table, SelectOp) ->
   fun() ->
     ets:select(Table, SelectOp)
+  end.
+
+toList(Table) ->
+  fun() ->
+    ets:tab2list(Table)
   end.
 
 selectOne(Table, SelectOp) ->
@@ -81,9 +106,13 @@ selectOne(Table, SelectOp) ->
       end
   end.
 
+lookup(Table, Key) ->
+  fun() ->
+    ets:lookup(Table, Key)
+  end.
+
 selectOp(K, V) ->
   [ {K, [], V} ].
-
 
 delete(Table) ->
   fun() ->
