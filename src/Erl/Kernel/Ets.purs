@@ -50,6 +50,8 @@ foreign import insertNew2 :: forall k v. Table -> Tuple2 k v -> Effect Boolean
 
 foreign import insert3 :: forall k v v2. Table -> Tuple3 k v v2 -> Effect Unit
 
+foreign import insertList2 :: forall k v. Table -> List (Tuple2 k v) -> Effect Unit
+
 foreign import updateCounter :: forall k. Table -> k -> UpdateOp -> Effect Int
 
 -- Cheeky hack so we can increment non-counter

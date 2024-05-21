@@ -3,6 +3,7 @@
 -export([ new/2
         , insert2/2
         , insertNew2/2
+        , insertList2/2
         , insert3/2
         , updateCounter/3
         , increment/4
@@ -29,6 +30,11 @@ new(Name, Options) ->
 insert2(Table, Tuple) ->
   fun() ->
       ets:insert(Table, Tuple)
+  end.
+
+insertList2(Table, List) ->
+  fun() ->
+      ets:insert(Table, List)
   end.
 
 insertNew2(Table, Tuple) ->
