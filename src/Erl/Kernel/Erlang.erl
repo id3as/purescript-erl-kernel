@@ -7,6 +7,8 @@
         , utcNowUs/0
         , vmNowUs/0
         , termToString/1
+        , termToBinary/1
+        , binaryToTerm/1
         , eqFfi/2
         , listToBinary/1
         , monitor/2
@@ -59,6 +61,12 @@ vmNowUs() ->
 
 termToString(Term) ->
     iolist_to_binary(io_lib:format("~p", [Term])).
+
+termToBinary(Term) ->
+    term_to_binary(Term).
+
+binaryToTerm(Binary) ->
+    binary_to_term(Binary).
 
 eqFfi(A,B) -> A == B.
 

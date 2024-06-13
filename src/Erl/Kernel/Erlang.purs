@@ -11,6 +11,8 @@ module Erl.Kernel.Erlang
   , vmNowUs
   , sleep
   , termToString
+  , termToBinary
+  , binaryToTerm
   , eqFfi
   , listToBinary
   , monitor
@@ -64,6 +66,9 @@ sleep ms = sleep_ (toFfiMilliseconds ms)
 foreign import sleep_ :: FfiMilliseconds -> Effect Unit
 
 foreign import termToString :: Foreign -> String
+
+foreign import termToBinary :: Foreign -> Binary
+foreign import binaryToTerm :: Binary -> Foreign
 
 foreign import eqFfi :: forall a. a -> a -> Boolean
 
