@@ -1,12 +1,16 @@
 module Erl.Kernel.Os
   ( cmd
   , osType
+  , getEnv
+  , setEnv
   , OsType(..)
   , OsFamily(..)
   , OsName(..)
   ) where
 
 import Prelude
+
+import Data.Maybe (Maybe)
 import Effect (Effect)
 import Erl.Atom (Atom)
 
@@ -29,9 +33,12 @@ data OsName
 
 derive instance Eq OsName
 
-data OsType
-  = OsType OsFamily OsName
+data OsType = OsType OsFamily OsName
 
 derive instance Eq OsType
 
 foreign import osType :: Effect OsType
+
+foreign import getEnv :: String -> Effect (Maybe String)
+
+foreign import setEnv :: String -> String -> Effect Unit

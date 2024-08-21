@@ -2,6 +2,7 @@
 
 -export([ showRef/1
         , eqRef/2
+        , ordRef/2
         , refToString/1
         , stringToRef/1
         ]).
@@ -11,6 +12,13 @@ showRef(Ref) ->
 
 eqRef(Ref1, Ref2) ->
     Ref1 =:= Ref2.
+
+ordRef(Ref1, Ref2) ->
+    if 
+        Ref1 < Ref2 -> {lT};
+        Ref2 > Ref1 -> {gT};
+        true -> {eQ}
+    end.
 
 refToString(Ref) ->
     list_to_binary(erlang:ref_to_list(Ref)).

@@ -2,6 +2,8 @@
 
 -export([ cmdImpl/1
         , osType/0
+        , getEnv/1
+        , setEnv/2
         ]).
 
 cmdImpl(Command) ->
@@ -24,4 +26,17 @@ osType() ->
                   Other -> {other, Other}
               end
             }
+    end.
+
+getEnv(Variable) ->
+    fun() ->
+        case os:getenv(binary_to_list(Variable)) of
+            false -> {nothing};
+            Val -> {just, list_to_binary(Val)}
+        end
+    end.
+
+setEnv(Variable, Value) ->
+    fun() ->
+        os:putenv(binary_to_list(Variable), binary_to_list(Value))
     end.

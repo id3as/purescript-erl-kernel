@@ -56,8 +56,12 @@ instance Show Ref where
 instance Eq Ref where
   eq = eqRef
 
+instance Ord Ref where
+  compare = ordRef
+
 foreign import showRef :: Ref -> String
 foreign import eqRef :: Ref -> Ref -> Boolean
+foreign import ordRef :: Ref -> Ref -> Ordering
 foreign import refToString :: Ref -> String
 foreign import stringToRef :: String -> Maybe Ref
 
