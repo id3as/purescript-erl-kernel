@@ -16,7 +16,7 @@ eqRef(Ref1, Ref2) ->
 ordRef(Ref1, Ref2) ->
     if 
         Ref1 < Ref2 -> {lT};
-        Ref2 > Ref1 -> {gT};
+        Ref1 > Ref2 -> {gT};
         true -> {eQ}
     end.
 
