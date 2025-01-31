@@ -14,6 +14,7 @@ module Erl.Kernel.Erlang
   , termToBinary
   , binaryToTerm
   , eqFfi
+  , ordFfi
   , listToBinary
   , monitor
   , monotonicTime
@@ -65,12 +66,14 @@ sleep ms = sleep_ (toFfiMilliseconds ms)
 
 foreign import sleep_ :: FfiMilliseconds -> Effect Unit
 
-foreign import termToString :: Foreign -> String
+foreign import termToString :: forall a. a -> String
 
 foreign import termToBinary :: Foreign -> Binary
 foreign import binaryToTerm :: Binary -> Foreign
 
 foreign import eqFfi :: forall a. a -> a -> Boolean
+
+foreign import ordFfi :: forall a. a -> a -> Ordering
 
 foreign import monitor :: Atom -> Pid -> Effect Unit
 

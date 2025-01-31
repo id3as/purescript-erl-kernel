@@ -74,10 +74,12 @@ module Erl.Kernel.Inet
   ) where
 
 import Prelude
+
 import Control.Bind (bindFlipped)
 import Data.Either (Either(..), hush)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
+import Data.Int (decimal, hexadecimal, toStringAs)
 import Data.Int.Bits ((.&.))
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Newtype (class Newtype)
@@ -92,8 +94,8 @@ import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List, filterMap, nil, (:))
 import Erl.Data.Map (Map, lookup)
 import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4, tuple8, uncurry4, uncurry8)
+import Erl.Kernel.Erlang (ordFfi)
 import Erl.Kernel.File as File
-import Data.Int (decimal, hexadecimal, toStringAs)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl, Octet(..), Hextet(..), hextet, octet)
 import Erl.Untagged.Union (class RuntimeType, type (|+|), Nil, RTInt, RTTuple4, RTTuple8, Union)
 import Foreign (Foreign, unsafeToForeign)
@@ -102,16 +104,16 @@ import Prim.RowList as RL
 import Record as Record
 import Type.Prelude (Proxy(..))
 
-type Hostname
-  = String
+type Hostname = String
 
-newtype Port
-  = Port Int
+newtype Port = Port Int
 
 derive instance Eq Port
+derive instance Ord Port
 derive instance Generic Port _
 instance Show Port where
   show = genericShow
+
 derive instance Newtype Port _
 instance RuntimeType Port RTInt
 
@@ -134,9 +136,9 @@ instance (Row.Lacks "active" options) => OptionsValid PassiveSocket options
 
 class Socket socket where
   send :: socket -> IOData -> Effect (Either SendError Unit)
-  
+
   recv :: socket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
-  
+
   close :: socket -> Effect Unit
 
 data PosixError
@@ -183,23 +185,23 @@ posixErrorToPurs f = case posixErrorToPursImpl f of
 
 foreign import posixErrorToPursImpl :: Foreign -> Maybe PosixError
 
-newtype Ip4Address
-  = Ip4Address (Tuple4 Octet Octet Octet Octet)
+newtype Ip4Address = Ip4Address (Tuple4 Octet Octet Octet Octet)
 
 derive instance Eq Ip4Address
 derive instance Generic Ip4Address _
 instance Show Ip4Address where
   show = genericShow
+
 derive instance Newtype Ip4Address _
 instance RuntimeType Ip4Address (RTTuple4 RTInt RTInt RTInt RTInt)
 
-newtype Ip6Address
-  = Ip6Address (Tuple8 Hextet Hextet Hextet Hextet Hextet Hextet Hextet Hextet)
+newtype Ip6Address = Ip6Address (Tuple8 Hextet Hextet Hextet Hextet Hextet Hextet Hextet Hextet)
 
 derive instance Eq Ip6Address
 derive instance Generic Ip6Address _
 instance Show Ip6Address where
   show = genericShow
+
 derive instance Newtype Ip6Address _
 instance RuntimeType Ip6Address (RTTuple8 RTInt RTInt RTInt RTInt RTInt RTInt RTInt RTInt)
 
@@ -207,10 +209,12 @@ data IpAddress
   = Ip4 Ip4Address
   | Ip6 Ip6Address
 
-type IpAddressUnion
-  = Union (Ip4Address |+| Ip6Address |+| Nil)
+type IpAddressUnion = Union (Ip4Address |+| Ip6Address |+| Nil)
 
 derive instance Eq IpAddress
+instance Ord IpAddress where
+  compare = ordFfi
+
 derive instance Generic IpAddress _
 instance Show IpAddress where
   show = genericShow
@@ -219,8 +223,7 @@ isMulticast :: IpAddress -> Boolean
 isMulticast (Ip4 (Ip4Address addr)) = uncurry4 (\(Octet a) _b _c _d -> a .&. 0xf0 == 0xe0) addr
 isMulticast (Ip6 (Ip6Address addr)) = uncurry8 (\(Hextet a) _b _c _d _e _f _g _h -> a .&. 0xff00 == 0xff00) addr
 
-type LocalAddress
-  = String
+type LocalAddress = String
 
 data SocketAddress
   = IpAddress IpAddress
@@ -230,8 +233,7 @@ data SocketAddress
 
 derive instance Eq SocketAddress
 
-type InterfaceName
-  = Atom
+type InterfaceName = Atom
 
 data InterfaceFlags
   = IfUp
@@ -241,19 +243,18 @@ data InterfaceFlags
   | IfRunning
   | IfMulticast
 
-type InterfaceAddressRecord ipType
-  = { address :: ipType
-    , netmask :: ipType
-    , broadcastAddress :: Maybe Ip4Address
-    , dstAddress :: Maybe Ip4Address
-    }
+type InterfaceAddressRecord ipType =
+  { address :: ipType
+  , netmask :: ipType
+  , broadcastAddress :: Maybe Ip4Address
+  , dstAddress :: Maybe Ip4Address
+  }
 
 data InterfaceAddresses
   = Ip4InterfaceAddresses (InterfaceAddressRecord Ip4Address)
   | Ip6InterfaceAddresses (InterfaceAddressRecord Ip6Address)
 
-newtype InterfaceOptions
-  = InterfaceOptions
+newtype InterfaceOptions = InterfaceOptions
   { flags :: List InterfaceFlags
   , addresses :: Maybe InterfaceAddresses
   , hwAddress :: Binary
@@ -262,10 +263,10 @@ newtype InterfaceOptions
 getIfAddresses :: Effect (Either PosixError (Map InterfaceName (List InterfaceOptions)))
 getIfAddresses = getIfAddressesImpl Left Right
 
-foreign import getIfAddressesImpl ::
-  (PosixError -> Either PosixError (Map InterfaceName (List InterfaceOptions))) ->
-  (Map InterfaceName (List InterfaceOptions) -> Either PosixError (Map InterfaceName (List InterfaceOptions))) ->
-  Effect (Either PosixError (Map InterfaceName (List InterfaceOptions)))
+foreign import getIfAddressesImpl
+  :: (PosixError -> Either PosixError (Map InterfaceName (List InterfaceOptions)))
+  -> (Map InterfaceName (List InterfaceOptions) -> Either PosixError (Map InterfaceName (List InterfaceOptions)))
+  -> Effect (Either PosixError (Map InterfaceName (List InterfaceOptions)))
 
 getIp4IfAddresses :: InterfaceName -> Effect (List Ip4Address)
 getIp4IfAddresses name =
@@ -313,8 +314,7 @@ data AddressFamily
 
 derive instance Eq AddressFamily
 
-data Raw
-  = Raw NonNegInt NonNegInt Binary
+data Raw = Raw NonNegInt NonNegInt Binary
 
 derive instance Eq Raw
 
@@ -351,32 +351,33 @@ data SocketMode
 
 derive instance Eq SocketMode
 
-type CommonOptions r
-  = ( active :: Maybe SocketActive
-    , buffer :: Maybe NonNegInt
-    , dontroute :: Maybe Boolean
-    , header :: Maybe NonNegInt
-    , high_msgq_watermark :: Maybe NonNegInt
-    , low_msgq_watermark :: Maybe NonNegInt
-    , priority :: Maybe Int
-    , raw :: Maybe (List Raw)
-    , recbuf :: Maybe NonNegInt
-    , reuseaddr :: Maybe Boolean
-    , sndbuf :: Maybe NonNegInt
-    , tos :: Maybe Int
-    , tclass :: Maybe NonNegInt
-    , ttl :: Maybe NonNegInt
-    , recvtos :: Maybe Boolean
-    , recvtclass :: Maybe Boolean
-    , recvttl :: Maybe Boolean
-    , ipv6_v6only :: Maybe Boolean
-    | r
-    )
+type CommonOptions r =
+  ( active :: Maybe SocketActive
+  , buffer :: Maybe NonNegInt
+  , dontroute :: Maybe Boolean
+  , header :: Maybe NonNegInt
+  , high_msgq_watermark :: Maybe NonNegInt
+  , low_msgq_watermark :: Maybe NonNegInt
+  , priority :: Maybe Int
+  , raw :: Maybe (List Raw)
+  , recbuf :: Maybe NonNegInt
+  , reuseaddr :: Maybe Boolean
+  , sndbuf :: Maybe NonNegInt
+  , tos :: Maybe Int
+  , tclass :: Maybe NonNegInt
+  , ttl :: Maybe NonNegInt
+  , recvtos :: Maybe Boolean
+  , recvtclass :: Maybe Boolean
+  , recvttl :: Maybe Boolean
+  , ipv6_v6only :: Maybe Boolean
+  | r
+  )
 
-defaultCommonOptions ::
-  forall r.
-  Row.Union r (CommonOptions ()) (CommonOptions r) =>
-  Record r -> Record (CommonOptions r)
+defaultCommonOptions
+  :: forall r
+   . Row.Union r (CommonOptions ()) (CommonOptions r)
+  => Record r
+  -> Record (CommonOptions r)
 defaultCommonOptions r =
   Record.union r
     { active: Nothing
@@ -428,11 +429,12 @@ instance Show ActiveError where
 activeErrorToPurs :: Foreign -> Maybe ActiveError
 activeErrorToPurs f = activeErrorToPursImpl ((map ActivePosix) <<< posixErrorToPurs) f
 
-optionsToErl ::
-  forall r rl.
-  RL.RowToList r rl =>
-  OptionsToErl r rl =>
-  Record r -> List Foreign
+optionsToErl
+  :: forall r rl
+   . RL.RowToList r rl
+  => OptionsToErl r rl
+  => Record r
+  -> List Foreign
 optionsToErl = makeTerms (Proxy :: _ rl)
 
 instance ToErl Raw where
@@ -573,6 +575,7 @@ printIpAddress (Ip4 v4) =
 
 printIpAddress (Ip6 v6) =
   printIpv6 v6
+
 ------------------------------------------------------------------------------
 -- IP Address helpers
 ------------------------------------------------------------------------------
@@ -582,6 +585,7 @@ foreign import parseIp4Address :: String -> Maybe Ip4Address
 foreign import parseIp6Address :: String -> Maybe Ip6Address
 foreign import ntoa4 :: Ip4Address -> String
 foreign import ntoa6 :: Ip6Address -> String
+
 ------------------------------------------------------------------------------
 ntoa :: IpAddress -> String
 ntoa (Ip4 addr) = ntoa4 addr

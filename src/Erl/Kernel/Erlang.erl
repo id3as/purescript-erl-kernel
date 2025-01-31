@@ -10,6 +10,7 @@
         , termToBinary/1
         , binaryToTerm/1
         , eqFfi/2
+        , ordFfi/2
         , listToBinary/1
         , monitor/2
         , monotonicTime_/1
@@ -69,6 +70,12 @@ binaryToTerm(Binary) ->
     binary_to_term(Binary).
 
 eqFfi(A,B) -> A == B.
+
+ordFfi(A,B) ->
+  if A < B -> {lT};
+     A > B -> {gT};
+     A == B -> {eQ}
+  end.
 
 monitor(Type, Item) ->
   fun() ->

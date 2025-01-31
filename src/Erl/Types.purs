@@ -69,6 +69,7 @@ newtype Octet = Octet Int
 
 derive instance Generic Octet _
 derive instance Eq Octet
+derive instance Ord Octet
 instance Show Octet where
   show = genericShow
 
@@ -86,6 +87,7 @@ octet i
 newtype Hextet = Hextet Int
 
 derive instance Eq Hextet
+derive instance Ord Hextet
 derive instance Generic Hextet _
 instance Show Hextet where
   show = genericShow
@@ -140,6 +142,8 @@ newtype Microsecond = Microsecond Int
 newtype Nanosecond = Nanosecond Int
 
 newtype FfiMilliseconds = FfiMilliseconds Int
+
+derive newtype instance Show FfiMilliseconds
 
 toFfiMilliseconds :: Duration.Milliseconds -> FfiMilliseconds
 toFfiMilliseconds (Duration.Milliseconds ms) = FfiMilliseconds $ round ms
