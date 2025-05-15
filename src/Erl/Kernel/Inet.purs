@@ -64,6 +64,7 @@ module Erl.Kernel.Inet
   , printIpAddress
   , printIpv4
   , printIpv6
+  , getHostName
   , getHostByName
   , hostAddressToIp
   , posixErrorToPurs
@@ -526,6 +527,8 @@ foreign import sendErrorToPursImpl :: (Foreign -> Maybe SendError) -> Foreign ->
 foreign import activeErrorToPursImpl :: (Foreign -> Maybe ActiveError) -> Foreign -> Maybe ActiveError
 
 foreign import connectErrorToPursImpl :: (Foreign -> Maybe ConnectError) -> Foreign -> Maybe ConnectError
+
+foreign import getHostName :: Effect String
 
 foreign import getHostByName :: Hostname -> Effect (Either Foreign IpAddress)
 

@@ -12,6 +12,7 @@
         , trueSocketOptVal/0
         , falseSocketOptVal/0
         , getIfAddressesImpl/2
+        , getHostName/0
         , getHostByName/1
         ]).
 
@@ -213,6 +214,11 @@ ipTupleToPurs(Ip) when tuple_size(Ip) == 4 ->
 ipTupleToPurs(Ip) when tuple_size(Ip) == 8 ->
   ?ip6(Ip).
 
+getHostName() ->
+  fun() ->
+    {ok, Name} = inet:gethostname(),
+    list_to_binary(Name)
+  end.
 
 getHostByName(Host) ->
   fun() ->
