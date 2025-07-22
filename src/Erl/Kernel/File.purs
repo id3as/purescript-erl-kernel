@@ -8,11 +8,14 @@ module Erl.Kernel.File
   , FileDelayedWrite(..)
   , FileReadAhead(..)
   , Encoding(..)
+  , Location(..)
   , open
   , read
   , readFile
   , rename
   , write
+  , pwrite
+  , pread
   , writeFile
   , sync
   , seek
@@ -38,12 +41,14 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String.NonEmpty (NonEmptyString)
 import Effect (Effect)
+import Erl.Atom (atom)
 import Erl.Data.Binary (Binary)
 import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List)
 import Erl.Data.List as List
+import Erl.Data.Tuple (tuple2)
 import Erl.Types (SandboxedDir, SandboxedFile)
-import Foreign (Foreign)
+import Foreign (Foreign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
 import Pathy (class IsDirOrFile, class IsRelOrAbs, Abs, Dir, Parser, Path, RelDir, RelFile, SandboxedPath, extension, fileName, parseAbsDir, parseRelDir, parseRelFile, posixParser, posixPrinter, printPath, unsandbox)
 import Prim.Row as Row
@@ -107,6 +112,18 @@ foreign import posixErrorToPurs :: Foreign -> Maybe PosixError
 
 foreign import fileErrorToPurs :: Foreign -> FileError
 
+data Location
+  = LocationDirect Int
+  | LocationBof Int
+  | LocationCur Int
+  | LocationEof Int
+
+locationToFfi :: Location -> Foreign
+locationToFfi (LocationDirect number) = unsafeToForeign number
+locationToFfi (LocationBof number) = unsafeToForeign $ tuple2 (atom "bof") number
+locationToFfi (LocationCur number) = unsafeToForeign $ tuple2 (atom "cur") number
+locationToFfi (LocationEof number) = unsafeToForeign $ tuple2 (atom "eof") number
+
 data FileError
   = Eof
   | BadArg
@@ -153,6 +170,12 @@ foreign import readImpl
   -> Int
   -> Effect (Either FileError Binary)
 
+foreign import preadImpl
+  :: FileHandle
+  -> Foreign
+  -> Int
+  -> Effect (Either FileError Binary)
+
 foreign import readFileImpl
   :: (FileError -> Either FileError Binary)
   -> (Binary -> Either FileError Binary)
@@ -163,6 +186,14 @@ foreign import writeImpl
   :: (FileError -> Either FileError IOData)
   -> (Either FileError Unit)
   -> FileHandle
+  -> IOData
+  -> Effect (Either FileError Unit)
+
+foreign import pwriteImpl
+  :: (FileError -> Either FileError IOData)
+  -> (Either FileError Unit)
+  -> FileHandle
+  -> Foreign
   -> IOData
   -> Effect (Either FileError Unit)
 
@@ -317,6 +348,9 @@ delDirR = delDirRImpl Left (Right unit) <<< dirToString
 read :: FileHandle -> Int -> Effect (Either FileError Binary)
 read = readImpl
 
+pread :: FileHandle -> Location -> Int -> Effect (Either FileError Binary)
+pread handle location amount = preadImpl handle (locationToFfi location) amount
+
 close :: FileHandle -> Effect (Either FileError Unit)
 close = closeImpl Left (Right unit)
 
@@ -328,6 +362,9 @@ sync = syncImpl Left (Right unit)
 
 write :: FileHandle -> IOData -> Effect (Either FileError Unit)
 write = writeImpl Left (Right unit)
+
+pwrite :: FileHandle -> Location -> IOData -> Effect (Either FileError Unit)
+pwrite handle location iodata = pwriteImpl Left (Right unit) handle (locationToFfi location) iodata
 
 writeFile :: SandboxedFile -> IOData -> Effect (Either FileError Unit)
 writeFile = writeFileImpl Left (Right unit) <<< fileToString

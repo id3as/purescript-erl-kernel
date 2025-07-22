@@ -3,8 +3,10 @@
 -export([
          openImpl/3,
          readImpl/2,
+         preadImpl/3,
          readFileImpl/3,
          writeImpl/4,
+         pwriteImpl/5,
          writeFileImpl/4,
          renameImpl/4,
          closeImpl/3,
@@ -110,6 +112,18 @@ readImpl(Handle, Amount) ->
     unsafeRead(Handle, Amount)
   end.
 
+preadImpl(Handle, Location, Amount) ->
+  fun() ->
+    case file:pread(Handle, Location, Amount) of
+      {ok, Data} ->
+         {right, Data};
+      eof ->
+        {left, fileErrorToPurs(eof)};
+      {error, Err} ->
+        {left, fileErrorToPurs(Err)}
+    end
+  end.
+
 %% This function exists and is exported since it is known about by the purerl optimiser to 
 %% enable it to remove the thunk around `readImpl`
 unsafeRead(Handle, Amount) ->
@@ -145,6 +159,16 @@ renameImpl(Left, Right, Source, Dest) ->
 writeImpl(Left, Right, Handle, Data) ->
   fun() ->
       case file:write(Handle, Data) of
+        ok ->
+          Right;
+        {error, Err} ->
+          Left(fileErrorToPurs(Err))
+      end
+  end.
+
+pwriteImpl(Left, Right, Handle, Location, Data) ->
+  fun() ->
+      case file:pwrite(Handle, Location, Data) of
         ok ->
           Right;
         {error, Err} ->
