@@ -132,6 +132,7 @@ newtype StrictlyMonotonicInt = StrictlyMonotonicInt Int
 
 derive instance Eq StrictlyMonotonicInt
 derive newtype instance Ord StrictlyMonotonicInt
+derive newtype instance Show StrictlyMonotonicInt
 
 newtype Second = Second Int
 
