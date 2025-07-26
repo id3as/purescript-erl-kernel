@@ -19,8 +19,12 @@ import Prelude
 
 import Data.Either (Either)
 import Effect (Effect)
+import Erl.Kernel.Erlang (eqFfi)
 
 data AtomicsRef
+
+instance Eq AtomicsRef where
+  eq = eqFfi
 
 data Signedness
   = Signed
