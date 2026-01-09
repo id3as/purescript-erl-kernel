@@ -12,6 +12,7 @@
          closeImpl/3,
          syncImpl/3,
          seekImpl/5,
+         truncateImpl/3,
          copyImpl/5,
          deleteImpl/3,
          cwdImpl/2,
@@ -207,6 +208,15 @@ deleteImpl(Left, Right, Handle) ->
 syncImpl(Left, Right, Handle) ->
   fun() ->
       case file:sync(Handle) of
+        ok -> Right;
+        {error, Err} ->
+          Left(fileErrorToPurs(Err))
+      end
+  end.
+
+truncateImpl(Left, Right, Handle) ->
+  fun() ->
+      case file:truncate(Handle) of
         ok -> Right;
         {error, Err} ->
           Left(fileErrorToPurs(Err))

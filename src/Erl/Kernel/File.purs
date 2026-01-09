@@ -1,39 +1,41 @@
 module Erl.Kernel.File
-  ( PosixError(..)
+  ( Encoding(..)
+  , FileDelayedWrite(..)
   , FileError(..)
   , FileHandle
   , FileOpenMode(..)
   , FileOutputType(..)
   , FilePositioning(..)
-  , FileDelayedWrite(..)
   , FileReadAhead(..)
-  , Encoding(..)
   , Location(..)
+  , PosixError(..)
+  , close
+  , copy
+  , cwd
+  , delDir
+  , delDirR
+  , delete
+  , dirToString
+  , fileErrorToPurs
+  , fileExtension
+  , fileToString
+  , length
+  , listDir
   , open
+  , pathToString
+  , posixErrorToPurs
+  , pread
+  , pwrite
   , read
   , readFile
   , rename
-  , write
-  , pwrite
-  , pread
-  , writeFile
-  , sync
   , seek
-  , length
-  , close
-  , copy
-  , delete
-  , cwd
-  , posixErrorToPurs
-  , fileErrorToPurs
-  , listDir
-  , fileToString
-  , dirToString
-  , pathToString
-  , fileExtension
-  , delDir
-  , delDirR
-  ) where
+  , sync
+  , truncate
+  , write
+  , writeFile
+  )
+  where
 
 import Prelude hiding (join)
 
@@ -253,6 +255,13 @@ foreign import seekImpl
   -> Int
   -> Effect (Either FileError Int)
 
+
+foreign import truncateImpl
+  :: (FileError -> Either FileError Unit)
+  -> (Either FileError Unit)
+  -> FileHandle
+  -> Effect (Either FileError Unit)
+
 foreign import copyImpl
   :: (FileError -> Either FileError Int)
   -> (Int -> Either FileError Int)
@@ -377,6 +386,9 @@ rename source dest = renameImpl Left (Right unit) (fileToString source) (fileToS
 
 seek :: FileHandle -> FilePositioning -> Int -> Effect (Either FileError Int)
 seek = seekImpl Left Right
+
+truncate :: FileHandle -> Effect (Either FileError Unit)
+truncate = truncateImpl Left (Right unit)
 
 length :: FileHandle -> Effect (Either FileError Int)
 length file =
