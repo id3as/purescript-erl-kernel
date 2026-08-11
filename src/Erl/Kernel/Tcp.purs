@@ -35,7 +35,7 @@ import Prelude
 import ConvertableOptions (class ConvertOption, class ConvertOptionsWithDefaults, convertOptionsWithDefaults)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromMaybe')
+import Data.Maybe (Maybe(..), fromMaybe, fromMaybe')
 import Data.Show.Generic (genericShow)
 import Data.Time.Duration (Milliseconds)
 import Effect (Effect)
@@ -45,10 +45,10 @@ import Erl.Data.Binary (Binary)
 import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List)
 import Erl.Data.Tuple (tuple2)
-import Erl.Kernel.Inet (class OptionsValid, class Socket, ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError, ConnectedSocket, ListenSocket, PassiveSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
+import Erl.Kernel.Inet (class OptionsValid, class Socket, ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError(..), ConnectedSocket, ListenSocket, PassiveSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
-import Foreign (Foreign, unsafeToForeign)
+import Foreign (Foreign, unsafeFromForeign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
 import Pathy (Abs, File, SandboxedPath)
 import Prim.Row as Row
@@ -337,6 +337,17 @@ acceptPassive socket timeout = liftEffect $ acceptImpl (Left <<< fromMaybe' (\_ 
 close :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> Effect Unit
 close = closeImpl
 
+-- | Total connect-error translation. A connect failure atom outside the POSIX
+-- | table (notably `nxdomain` from a host whose name no longer resolves, also
+-- | `eacces`/`emfile`/…) is not in `connectErrorToPurs`, which returns `Nothing`
+-- | for it; the other FFI wrappers turn that `Nothing` into
+-- | `unsafeCrashWith "invalidError"`, which unwinds the caller's state machine.
+-- | Here we instead surface it as `ConnectOther`, so a connect failure always
+-- | flows to the caller's retry path. Kept local to the connect sites so the
+-- | shared `Inet.connectErrorToPurs` (also used by erl-ssl) is unchanged.
+connectErrorToPursTotal :: Foreign -> ConnectError
+connectErrorToPursTotal f = fromMaybe (ConnectOther (unsafeFromForeign f)) (connectErrorToPurs f)
+
 connect
   :: forall options m
    . MonadEffect m
@@ -354,7 +365,7 @@ connect address port options timeout = do
     addressErl = toErl address
     forced = Record.disjointUnion forcedOptions options
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultConnectOptions forced
-  liftEffect $ connectImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< connectErrorToPurs) Right addressErl port optionsErl (toErl timeout)
+  liftEffect $ connectImpl (Left <<< connectErrorToPursTotal) Right addressErl port optionsErl (toErl timeout)
 
 connectPassive
   :: forall options
@@ -373,7 +384,7 @@ connectPassive address port options timeout = do
     forced = Record.disjointUnion forcedOptions options
     merged = convertOptionsWithDefaults OptionToMaybe defaultConnectOptions forced
     optionsErl = optionsToErl merged { active = Just Passive }
-  liftEffect $ connectImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< connectErrorToPurs) Right addressErl port optionsErl (toErl timeout)
+  liftEffect $ connectImpl (Left <<< connectErrorToPursTotal) Right addressErl port optionsErl (toErl timeout)
 
 listen
   :: forall options

@@ -297,6 +297,10 @@ instance ToErl ConnectAddress where
 data ConnectError
   = ConnectTimeout
   | ConnectPosix PosixError
+  -- Any connect failure atom not in the POSIX table (e.g. `nxdomain` from a host
+  -- whose name no longer resolves, `eacces`, `emfile`). Keeps translation total
+  -- so an unrecognised reason reaches the caller's retry path instead of crashing.
+  | ConnectOther Atom
 
 derive instance Eq ConnectError
 

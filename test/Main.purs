@@ -16,7 +16,7 @@ import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
 import Erl.Kernel.File (listDir)
-import Erl.Kernel.Inet (ActiveError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
+import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), ConnectError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
 import Erl.Kernel.Udp (UdpMessage(..))
@@ -146,6 +146,17 @@ tcpTests = do
                   _ <- assertTrue $ msg2 == toBinary "ld"
                   closed <- Tcp.recv client 0 InfiniteTimeout
                   assertTrue $ closed == Left ActiveClosed
+    -- Regression: a connect failure atom outside the POSIX table (`.invalid` is
+    -- reserved by RFC 6761, so it always resolves to `nxdomain`) used to unwind
+    -- `connectImpl` via `unsafeCrashWith "invalidError"`, killing the caller.
+    -- Now it must surface as `Left (ConnectOther _)` so the caller can retry.
+    test "connect to an unresolvable host yields Left, not a crash" do
+      result <- liftEffect $ Tcp.connectPassive (HostAddr (Host "no-such-host.invalid")) (Port 80) {} (Timeout $ Milliseconds 5000.0)
+      liftEffect $ case result of
+        Left (ConnectOther _) -> pure unit
+        Left ConnectTimeout -> assert' "resolved to ConnectTimeout, expected ConnectOther nxdomain" false
+        Left (ConnectPosix _) -> assert' "resolved to ConnectPosix, expected ConnectOther nxdomain" false
+        Right _ -> assert' "unexpectedly connected to an invalid host" false
 
   where
   server :: Process ClientUnion -> ProcessM ServerUnion Unit
