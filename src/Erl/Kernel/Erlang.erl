@@ -129,47 +129,77 @@ cpuTopology() ->
       end
   end.
 
-%% Heirarchy for our output is nodes -> processors -> cores -> threads
-nodeTopology(NodesOrProcessors) ->
-  %% Top level could be nodes or processors
-  {Nodes, Processors} = lists:partition(fun({node, _}) ->
-                                            true;
-                                           (_) ->
-                                            false
-                                        end, NodesOrProcessors),
-  Nodes2 = case Processors of
-             [] ->
-               Nodes;
-             _ ->
-               Nodes ++ [{node, Processors}]
-           end,
-  [processorTopology(NodeProcessors) || {node, NodeProcessors} <- Nodes2].
+%% Hierarchy for our output is nodes -> processors -> cores -> threads.
+%%
+%% erlang:system_info(cpu_topology) is looser than that fixed shape: any level
+%% except the logical-cpu leaf may be absent, entries may carry an InfoList
+%% ({Tag, Info, SubLevel} as well as {Tag, SubLevel}), and `processor` may sit
+%% either above OR below `node`. Multi-die packages / sub-NUMA clustering (seen
+%% on large cloud instances) report e.g.
+%%   [{processor, [{node, [{core, [{thread, {logical, N}}, ...]}, ...]}, ...]}]
+%% i.e. a processor spanning several NUMA nodes with no per-node processor
+%% grouping. We normalise all of that into the fixed 4-level nesting,
+%% synthesising a singleton level wherever one is omitted, so an unexpected
+%% shape degrades to sensible grouping instead of crashing with function_clause.
+nodeTopology(Entries) ->
+  Es = as_list(Entries),
+  case [E || E <- Es, level_tag(E) =:= node] of
+    [] ->
+      %% No node level here. If a processor level sits above the nodes (a
+      %% processor spanning multiple NUMA nodes), descend through it; otherwise
+      %% treat the whole system as a single node.
+      case lists:append([as_list(level_sub(E)) || E <- Es, level_tag(E) =:= processor]) of
+        [] ->
+          [processorTopology(Es)];
+        Inner ->
+          nodeTopology(Inner)
+      end;
+    Nodes ->
+      [processorTopology(level_sub(N)) || N <- Nodes]
+  end.
 
-processorTopology(Processors) ->
-  %% Processors are just processors
-  [coreTopology(Cores) || {processor, Cores} <- Processors].
+processorTopology(Entries) ->
+  Es = as_list(Entries),
+  case [E || E <- Es, level_tag(E) =:= processor] of
+    [] ->
+      %% No processor level: synthesise a single processor holding the cores.
+      [coreTopology(Es)];
+    Processors ->
+      [coreTopology(level_sub(P)) || P <- Processors]
+  end.
 
-coreTopology(CoresOrThreads) ->
-  %% Core level could be cores or threads
-  {Cores, Threads} = lists:partition(fun({core, _}) ->
-                                            true;
-                                           (_) ->
-                                            false
-                                        end, CoresOrThreads),
-  Cores2 = case Threads of
-             [] ->
-               Cores;
-             _ ->
-               Cores ++ [{core, Threads}]
-           end,
-  [threadTopology(CoreThreads) || {core, CoreThreads} <- Cores2].
+coreTopology(Entries) ->
+  Es = as_list(Entries),
+  case [E || E <- Es, level_tag(E) =:= core] of
+    [] ->
+      %% No core level: synthesise a single core holding the threads.
+      [threadTopology(Es)];
+    Cores ->
+      [threadTopology(level_sub(C)) || C <- Cores]
+  end.
 
 threadTopology({logical, Id}) ->
+  %% Thread level omitted: the core's sublevel is a bare logical cpu id.
   [Id];
-threadTopology([]) ->
-  [];
-threadTopology([{thread, {logical, Id}} | T]) ->
-  [Id | threadTopology(T)].
+threadTopology(Entries) when is_list(Entries) ->
+  lists:append([logicalId(E) || E <- Entries]).
+
+logicalId({logical, Id}) -> [Id];
+logicalId({thread, Sub}) -> threadTopology(Sub);
+logicalId({thread, _Info, Sub}) -> threadTopology(Sub);
+logicalId(_) -> [].
+
+%% erlang:system_info(cpu_topology) entries are {Tag, SubLevel} or, with an
+%% info list, {Tag, InfoList, SubLevel}. These two helpers read either form.
+level_tag({Tag, _Info, _Sub}) -> Tag;
+level_tag({Tag, _Sub}) -> Tag;
+level_tag(_) -> undefined.
+
+level_sub({_Tag, _Info, Sub}) -> Sub;
+level_sub({_Tag, Sub}) -> Sub.
+
+as_list(L) when is_list(L) -> L;
+as_list(X) -> [X].
 
 totalSystemMemory() ->
   fun() ->
