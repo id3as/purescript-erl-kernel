@@ -40,7 +40,9 @@ module Erl.Kernel.File
 import Prelude hiding (join)
 
 import Data.Either (Either(..))
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
+import Data.Show.Generic (genericShow)
 import Data.String.NonEmpty (NonEmptyString)
 import Effect (Effect)
 import Erl.Atom (atom)
@@ -105,10 +107,10 @@ data PosixError
   | EXdev
 
 derive instance eq_PosixError :: Eq PosixError
+derive instance generic_PosixError :: Generic PosixError _
 
---derive instance posixError_generic :: Generic PosixError _
 instance posixError_show :: Show PosixError where
-  show _ = "file posix" --genericShow
+  show = genericShow
 
 foreign import posixErrorToPurs :: Foreign -> Maybe PosixError
 

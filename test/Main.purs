@@ -15,7 +15,7 @@ import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
-import Erl.Kernel.File (listDir)
+import Erl.Kernel.File (PosixError(..), listDir)
 import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), ConnectError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
@@ -61,6 +61,11 @@ fileTests = do
     test "can list tmp" $ liftEffect do
       res <- listDir $ Left $ unsafeFromJust "impossible" $ sandbox rootDir $ rootDir </> dir (Proxy :: _ "tmp")
       assertTrue $ isRight res
+
+    test "PosixError distinguishes its constructors" $ liftEffect do
+      assertEqual { expected: "ENoent", actual: show ENoent }
+      assertEqual { expected: "EAcces", actual: show EAcces }
+      assertTrue $ show ENoent /= show EAcces
 
 tcpTests :: Free TestF Unit
 tcpTests = do
