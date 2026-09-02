@@ -3,9 +3,10 @@ module Test.Main where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Either (Either(..), fromRight', isRight)
+import Data.Either (Either(..), fromRight', hush, isRight)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromMaybe', isNothing)
+import Data.Traversable (traverse)
 import Data.Show.Generic (genericShow)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
@@ -15,7 +16,7 @@ import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
-import Erl.Kernel.File (Filename, PosixError(..), filename, filenameToString, listDir, makeDir, readFile, writeFile)
+import Erl.Kernel.File (FileAccess(..), FileError(..), FileType(..), Filename, PosixError(..), filename, filenameToString, listDir, makeDir, readFile, readFileInfo, readLinkInfo, writeFile)
 import Erl.Data.List (List)
 import Erl.Data.List as List
 import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), ConnectError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
@@ -127,7 +128,54 @@ fileTests = do
         , actual: filenameToString <$> entries
         }
 
+  suite "file info tests" do
+    test "reports size, access and type, and tells a directory from a file" $ liftEffect do
+      fixture <- makeFixture
+      wrote <- writeFile (fn $ fixture <> "afile.txt") $ IOData.fromBinary $ toBinary "hello"
+      assertTrue $ isRight wrote
+      fileInfo <- unsafeFromRight "readFileInfo must succeed" <$> readFileInfo (fn $ fixture <> "afile.txt")
+      assertEqual { expected: Regular, actual: fileInfo.fileType }
+      assertEqual { expected: 5, actual: fileInfo.size }
+      assertEqual { expected: AccessReadWrite, actual: fileInfo.access }
+      dirInfo <- unsafeFromRight "readFileInfo must succeed" <$> readFileInfo (fn fixture)
+      assertEqual { expected: Directory, actual: dirInfo.fileType }
+
+    -- The reason it is here at all: listDir no longer classifies entries, so the
+    -- answer has to come from asking about the joined path. Asking about the
+    -- bare entry name asks about the process cwd instead, which is precisely the
+    -- bug the old classifying listDir shipped.
+    test "classifies a listDir entry once it is joined onto the directory" $ liftEffect do
+      fixture <- makeFixture
+      entries <- List.sort <$> listFixture fixture
+      types <- traverse (map (map _.fileType <<< hush) <<< readFileInfo <<< joinOnto fixture) entries
+      assertEqual
+        { expected: List.fromFoldable [ Just Regular, Just Directory ]
+        , actual: types
+        }
+
+    test "a missing name is ENoent rather than a crash" $ liftEffect do
+      fixture <- makeFixture
+      res <- readFileInfo $ fn $ fixture <> "no-such-thing"
+      assertEqual { expected: Just ENoent, actual: posixOf res }
+
+    -- readFileInfo follows the link and readLinkInfo does not, so Symlink is
+    -- only ever reachable through the latter -- and a link to nothing is ENoent
+    -- through the former, which is how a caller tells "absent" from "dangling".
+    test "readLinkInfo sees the symlink that readFileInfo follows through" $ liftEffect do
+      fixture <- makeFixture
+      created <- makeSymlinks fixture
+      when created do
+        throughLink <- readFileInfo $ fn $ fixture <> "alink"
+        assertEqual { expected: Just Regular, actual: _.fileType <$> hush throughLink }
+        atLink <- readLinkInfo $ fn $ fixture <> "alink"
+        assertEqual { expected: Just Symlink, actual: _.fileType <$> hush atLink }
+        broken <- readFileInfo $ fn $ fixture <> "broken"
+        assertEqual { expected: Just ENoent, actual: posixOf broken }
+        brokenLink <- readLinkInfo $ fn $ fixture <> "broken"
+        assertEqual { expected: Just Symlink, actual: _.fileType <$> hush brokenLink }
+
 foreign import makeFixtureImpl :: Effect String
+foreign import makeSymlinksImpl :: String -> Effect Boolean
 foreign import makeRawEntryImpl :: String -> Effect Boolean
 foreign import rawNamesUnsupported :: Effect Boolean
 
@@ -136,6 +184,23 @@ makeFixture = makeFixtureImpl
 
 makeRawEntry :: String -> Effect Boolean
 makeRawEntry = makeRawEntryImpl
+
+-- | Reports whether the filesystem allowed the links, so a platform without
+-- | them skips visibly instead of failing.
+makeSymlinks :: String -> Effect Boolean
+makeSymlinks = makeSymlinksImpl
+
+-- | FileError has no Eq -- its Other carries a Foreign -- so assert on the
+-- | POSIX errno, which is the part being claimed.
+posixOf :: forall a. Either FileError a -> Maybe PosixError
+posixOf (Left (Posix e)) = Just e
+posixOf _ = Nothing
+
+-- | A directory listing entry is a bare name; it means nothing until it is put
+-- | back onto the directory it came from.
+joinOnto :: String -> Filename -> Filename
+joinOnto directory entry =
+  fn $ directory <> fromMaybe' (\_ -> unsafeCrashWith "fixture names are utf8") (filenameToString entry)
 
 listFixture :: String -> Effect (List Filename)
 listFixture fixture =

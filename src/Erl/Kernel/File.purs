@@ -1,12 +1,15 @@
 module Erl.Kernel.File
   ( Encoding(..)
+  , FileAccess(..)
   , FileDelayedWrite(..)
   , FileError(..)
   , FileHandle
+  , FileInfo
   , FileOpenMode(..)
   , FileOutputType(..)
   , FilePositioning(..)
   , FileReadAhead(..)
+  , FileType(..)
   , Location(..)
   , PosixError(..)
   , close
@@ -25,6 +28,8 @@ module Erl.Kernel.File
   , pwrite
   , read
   , readFile
+  , readFileInfo
+  , readLinkInfo
   , rename
   , seek
   , sync
@@ -42,6 +47,7 @@ import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
+import Data.Time.Duration (Seconds)
 import Effect (Effect)
 import Erl.Atom (atom)
 import Erl.Data.Binary (Binary)
@@ -247,6 +253,91 @@ foreign import listDirImpl
 -- | the directory and ask.
 listDir :: Filename -> Effect (Either FileError (List Filename))
 listDir = listDirImpl Left Right
+
+-- | What `file:read_file_info/2` reports a name as. `other` is OTP's own
+-- | catch-all -- a fifo, a socket -- so an atom this binding does not know maps
+-- | there rather than crashing.
+data FileType
+  = Device
+  | Directory
+  | Regular
+  | Symlink
+  | OtherFileType
+
+derive instance eq_FileType :: Eq FileType
+derive instance generic_FileType :: Generic FileType _
+
+instance fileType_show :: Show FileType where
+  show = genericShow
+
+-- | The owner's access to the name, as the emulator computed it from the mode.
+-- | Prefixed because `Read` and `Write` are already `FileOpenMode`s here.
+data FileAccess
+  = AccessNone
+  | AccessRead
+  | AccessWrite
+  | AccessReadWrite
+
+derive instance eq_FileAccess :: Eq FileAccess
+derive instance generic_FileAccess :: Generic FileAccess _
+
+instance fileAccess_show :: Show FileAccess where
+  show = genericShow
+
+-- | Erlang's `#file_info{}`, field for field.
+-- |
+-- | `atime`/`mtime`/`ctime` are seconds since the Unix epoch, UTC -- this binds
+-- | `{time, posix}` rather than the `{{Y,M,D},{H,M,S}}` tuples `read_file_info`
+-- | returns by default, which are in the *emulator's local time* and so mean
+-- | different instants on two machines reading the same disk. It is the same
+-- | quantity `Erl.Kernel.Time.seconds` returns.
+-- |
+-- | `minorDevice` is Unix-only and zero elsewhere; `ctime` is the inode's last
+-- | change on Unix and the creation time on Windows. Both are OTP's wording, not
+-- | ours.
+type FileInfo =
+  { size :: Int
+  , fileType :: FileType
+  , access :: FileAccess
+  , atime :: Seconds
+  , mtime :: Seconds
+  , ctime :: Seconds
+  , mode :: Int
+  , links :: Int
+  , majorDevice :: Int
+  , minorDevice :: Int
+  , inode :: Int
+  , uid :: Int
+  , gid :: Int
+  }
+
+foreign import readFileInfoImpl
+  :: (FileError -> Either FileError FileInfo)
+  -> (FileInfo -> Either FileError FileInfo)
+  -> Filename
+  -> Effect (Either FileError FileInfo)
+
+foreign import readLinkInfoImpl
+  :: (FileError -> Either FileError FileInfo)
+  -> (FileInfo -> Either FileError FileInfo)
+  -> Filename
+  -> Effect (Either FileError FileInfo)
+
+-- | `file:read_file_info/2`. Follows symlinks, so it never reports `Symlink` and
+-- | a symlink to nothing is `Posix ENoent` rather than a link with a dangling
+-- | target. Use `readLinkInfo` to see the link itself.
+-- |
+-- | This is also the answer to "is this entry a directory?" now that `listDir`
+-- | returns names without classifying them -- ask about the joined path, not the
+-- | bare entry, or you are asking about the process cwd.
+readFileInfo :: Filename -> Effect (Either FileError FileInfo)
+readFileInfo = readFileInfoImpl Left Right
+
+-- | `file:read_link_info/2`: the same record, but about the symlink rather than
+-- | what it points at. On a name that is not a symlink it agrees with
+-- | `readFileInfo`.
+readLinkInfo :: Filename -> Effect (Either FileError FileInfo)
+readLinkInfo = readLinkInfoImpl Left Right
 
 foreign import syncImpl
   :: (FileError -> Either FileError Unit)

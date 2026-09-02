@@ -1,5 +1,7 @@
 -module(erl_kernel_file@foreign).
 
+-include_lib("kernel/include/file.hrl").
+
 -export([
          openImpl/3,
          readImpl/2,
@@ -17,6 +19,8 @@
          deleteImpl/3,
          cwdImpl/2,
          listDirImpl/3,
+         readFileInfoImpl/3,
+         readLinkInfoImpl/3,
          delDirImpl/3,
          delDirRImpl/3,
          makeDirImpl/3,
@@ -277,6 +281,72 @@ listDirImpl(Left, Right, Dir) ->
 %% ones as raw binaries. Both are Filenames; only the first needs converting.
 to_filename(Name) when is_binary(Name) -> Name;
 to_filename(Name) -> unicode:characters_to_binary(Name).
+
+%% {time, posix} rather than the default: the default is a {{Y,M,D},{H,M,S}}
+%% tuple in the emulator's *local* time, so the same file read from two machines
+%% reports two different instants. posix seconds are the same quantity
+%% Erl.Kernel.Time.seconds returns.
+%%
+%% raw skips the file server, which is a single process and a real bottleneck
+%% when a rebuild pass stats a directory's worth of entries. file:open/2 here
+%% already defaults to raw for the same reason.
+readFileInfoImpl(Left, Right, Name) ->
+  fun() ->
+    fileInfoToPurs(Left, Right, file:read_file_info(Name, [raw, {time, posix}]))
+  end.
+
+readLinkInfoImpl(Left, Right, Name) ->
+  fun() ->
+    fileInfoToPurs(Left, Right, file:read_link_info(Name, [raw, {time, posix}]))
+  end.
+
+fileInfoToPurs(_Left, Right, {ok, #file_info{ size = Size
+                                            , type = Type
+                                            , access = Access
+                                            , atime = ATime
+                                            , mtime = MTime
+                                            , ctime = CTime
+                                            , mode = Mode
+                                            , links = Links
+                                            , major_device = MajorDevice
+                                            , minor_device = MinorDevice
+                                            , inode = INode
+                                            , uid = Uid
+                                            , gid = Gid
+                                            }}) ->
+  Right(#{ size => Size
+         , fileType => fileTypeToPurs(Type)
+         , access => fileAccessToPurs(Access)
+         , atime => float(ATime)
+         , mtime => float(MTime)
+         , ctime => float(CTime)
+         , mode => Mode
+         , links => Links
+         , majorDevice => MajorDevice
+         , minorDevice => MinorDevice
+         , inode => INode
+         , uid => Uid
+         , gid => Gid
+         });
+fileInfoToPurs(Left, _Right, {error, Err}) ->
+  Left(fileErrorToPurs(Err)).
+
+fileTypeToPurs(device) -> {device};
+fileTypeToPurs(directory) -> {directory};
+fileTypeToPurs(regular) -> {regular};
+fileTypeToPurs(symlink) -> {symlink};
+%% other is OTP's catch-all, so an unmapped atom belongs there rather than in a
+%% function_clause. undefined arrives the same way: the record type admits it
+%% because the record doubles as write_file_info's input.
+fileTypeToPurs(_) -> {otherFileType}.
+
+%% No catch-all constructor to hide behind here, so an unknown access maps to
+%% none -- claiming less access than the file has, which is the safe direction to
+%% be wrong in.
+fileAccessToPurs(read) -> {accessRead};
+fileAccessToPurs(write) -> {accessWrite};
+fileAccessToPurs(read_write) -> {accessReadWrite};
+fileAccessToPurs(_) -> {accessNone}.
 
 makeDirImpl(Left, Right, Dir) ->
   fun() ->

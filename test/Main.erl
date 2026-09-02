@@ -3,6 +3,7 @@
 -export([ makeFixtureImpl/0
         , makeRawEntryImpl/1
         , rawNamesUnsupported/0
+        , makeSymlinksImpl/1
         ]).
 
 %% Builds a throwaway directory holding one plain file and one subdirectory,
@@ -41,5 +42,18 @@ rawNamesUnsupported() ->
       ok -> file:delete(Probe), false;
       {error, eilseq} -> true;
       {error, _} -> true
+    end
+  end.
+
+%% One link to a file that exists and one to a name that does not, so the tests
+%% can tell "follows the link" from "sees the link" and "absent" from "dangling".
+%% Reports whether the filesystem allowed them -- symlinks are not universal, and
+%% a skip should be visible rather than a failure.
+makeSymlinksImpl(Dir) ->
+  fun() ->
+    case { file:make_symlink("afile.txt", <<Dir/binary, "alink">>)
+         , file:make_symlink("nowhere", <<Dir/binary, "broken">>) } of
+      {ok, ok} -> true;
+      _ -> false
     end
   end.
