@@ -20,7 +20,6 @@ package:
     - newtype
     - ordered-collections
     - partial
-    - pathy
     - prelude
     - record
     - strings
@@ -76,11 +75,6 @@ workspace:
         - unsafe-coerce
       git: https://github.com/id3as/purescript-erl-untagged-union.git
       ref: 781b2894f9ffcc91b7aea482e435bb9284596f62
-    pathy:
-      ref: c23c7b772c37bc499503ea63867287200fa44966
-      git: https://github.com/id3as/purescript-pathy.git
-      dependencies:
-        - prelude
   package_set:
     url: https://raw.githubusercontent.com/purerl/package-sets/erl-0.15.3-20220629/packages.json
     hash: sha256-kLmZv2u5dWVUUaQEwK0b3T1Ghce5a/hG0zlizaYfcXs=

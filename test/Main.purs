@@ -15,7 +15,9 @@ import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
-import Erl.Kernel.File (PosixError(..), listDir)
+import Erl.Kernel.File (Filename, PosixError(..), filename, filenameToString, listDir, makeDir, readFile, writeFile)
+import Erl.Data.List (List)
+import Erl.Data.List as List
 import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), ConnectError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
@@ -27,9 +29,8 @@ import Erl.Types (Hextet(..), Octet(..), Timeout(..))
 import Erl.Untagged.Union (class RuntimeType, type (|$|), type (|+|), Nil, RTLiteralAtom, RTOption, RTTuple1, Union, inj, prj)
 import Foreign (unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
-import Pathy (dir, rootDir, sandbox, (</>))
+import Erl.Data.Binary.IOData (fromBinary) as IOData
 import Test.Assert (assert', assertEqual, assertTrue)
-import Type.Prelude (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 main :: Effect Unit
@@ -57,15 +58,91 @@ type ServerUnion = Union |$| TcpMessage |+| Nil
 
 fileTests :: Free TestF Unit
 fileTests = do
+  suite "filename tests" do
+    test "filename rejects the two names POSIX does not allow" $ liftEffect do
+      assertEqual { expected: true, actual: isNothing $ filename "" }
+      assertEqual { expected: true, actual: isNothing $ filename "with\x0000nul" }
+
+    test "filename accepts a separator, because a Filename is a whole path" $ liftEffect do
+      assertEqual { expected: Just "/tmp/a/b", actual: filenameToString =<< filename "/tmp/a/b" }
+
   suite "file tests" do
     test "can list tmp" $ liftEffect do
-      res <- listDir $ Left $ unsafeFromJust "impossible" $ sandbox rootDir $ rootDir </> dir (Proxy :: _ "tmp")
+      res <- listDir $ fn "/tmp"
       assertTrue $ isRight res
 
     test "PosixError distinguishes its constructors" $ liftEffect do
       assertEqual { expected: "ENoent", actual: show ENoent }
       assertEqual { expected: "EAcces", actual: show EAcces }
       assertTrue $ show ENoent /= show EAcces
+
+    -- listDir used to decide dir-vs-file with filelib:is_dir/1 on the bare entry
+    -- name, which resolves against the process cwd rather than the directory
+    -- being listed, and appended "/" to whatever that mistook for a directory.
+    -- The names are now returned as they are on disk.
+    test "listDir returns entry names verbatim" $ liftEffect do
+      fixture <- makeFixture
+      entries <- listFixture fixture
+      assertEqual
+        { expected: List.fromFoldable [ Just "afile.txt", Just "subdir" ]
+        , actual: List.sort $ filenameToString <$> entries
+        }
+
+    -- Linux only. APFS refuses to create the fixture at all (eilseq), so on a
+    -- macOS dev box this asserts nothing -- which is to say the bug reproduces
+    -- in production and not on the machine you would debug it from. The
+    -- underlying difference is file:list_dir/1, which silently drops undecodable
+    -- names, versus file:list_dir_all/1, which returns them as raw binaries.
+    test "listDir returns entries whose names are not valid UTF-8" $ liftEffect do
+      fixture <- makeFixture
+      created <- makeRawEntry fixture
+      if created then do
+        entries <- listFixture fixture
+        assertEqual { expected: 3, actual: List.length entries }
+        assertEqual
+          { expected: 1
+          , actual: List.length $ List.filter (isNothing <<< filenameToString) entries
+          }
+      else
+        -- Not a silent pass: say why there was nothing to check.
+        assert' "fixture creation failed for a reason other than a raw-hostile filesystem"
+          =<< rawNamesUnsupported
+
+    test "makeDir then write, read and list it back" $ liftEffect do
+      fixture <- makeFixture
+      let nested = fn $ fixture <> "nested"
+      made <- makeDir nested
+      assertTrue $ isRight made
+      let target = fn $ fixture <> "nested/hello.txt"
+      wrote <- writeFile target $ IOData.fromBinary $ toBinary "hello"
+      assertTrue $ isRight wrote
+      readBack <- readFile target
+      assertEqual
+        { expected: toBinary "hello"
+        , actual: unsafeFromRight "readFile must succeed" readBack
+        }
+      entries <- listFixture $ fixture <> "nested/"
+      assertEqual
+        { expected: List.singleton (Just "hello.txt")
+        , actual: filenameToString <$> entries
+        }
+
+foreign import makeFixtureImpl :: Effect String
+foreign import makeRawEntryImpl :: String -> Effect Boolean
+foreign import rawNamesUnsupported :: Effect Boolean
+
+makeFixture :: Effect String
+makeFixture = makeFixtureImpl
+
+makeRawEntry :: String -> Effect Boolean
+makeRawEntry = makeRawEntryImpl
+
+listFixture :: String -> Effect (List Filename)
+listFixture fixture =
+  unsafeFromRight "listDir must succeed" <$> listDir (fn fixture)
+
+fn :: String -> Filename
+fn = unsafeFromJust "must be a valid filename" <<< filename
 
 tcpTests :: Free TestF Unit
 tcpTests = do

@@ -50,7 +50,7 @@ import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
 import Foreign (Foreign, unsafeFromForeign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
-import Pathy (Abs, File, SandboxedPath)
+import Erl.Kernel.Filename (Filename)
 import Prim.Row as Row
 import Record as Record
 import Unsafe.Coerce (unsafeCoerce)
@@ -196,7 +196,7 @@ type ConnectListenOptions r = Options
   , ifaddr :: Maybe SocketAddress
   , family :: Maybe AddressFamily
   , port :: Maybe Port
-  , netns :: Maybe (SandboxedPath Abs File)
+  , netns :: Maybe Filename
   , bind_to_device :: Maybe Binary
   | r
   )

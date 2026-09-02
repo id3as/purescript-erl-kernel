@@ -38,7 +38,7 @@ import Erl.Types (NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTInt, RTLiteralAtom, RTLiteralAtomConvert, RTOption, RTTuple2, RTTuple5, RTTuple6, RTWildcard)
 import Foreign (Foreign)
 import Partial.Unsafe (unsafeCrashWith)
-import Pathy (Abs, File, SandboxedPath)
+import Erl.Kernel.Filename (Filename)
 import Prim.Row as Row
 import Record as Record
 import Unsafe.Coerce (unsafeCoerce)
@@ -187,7 +187,7 @@ type OpenOptions = Options
   , ifaddr :: Maybe SocketAddress
   , family :: Maybe AddressFamily
   , port :: Maybe Port
-  , netns :: Maybe (SandboxedPath Abs File)
+  , netns :: Maybe Filename
   , bind_to_device :: Maybe Binary
   )
 

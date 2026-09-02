@@ -19,6 +19,7 @@
          listDirImpl/3,
          delDirImpl/3,
          delDirRImpl/3,
+         makeDirImpl/3,
          posixErrorToPurs/1,
          fileErrorToPurs/1,
          unsafeRead/2
@@ -254,27 +255,33 @@ copyImpl(Left, Right, Handle1, Handle2, Amount) ->
 cwdImpl(Left, Right) ->
   fun() ->
       case file:get_cwd() of
-        {ok, Cwd} -> Right(<<(unicode:characters_to_binary(Cwd))/binary, "/">>);
+        {ok, Cwd} -> Right(unicode:characters_to_binary(Cwd));
         {error, Err} -> Left(fileErrorToPurs(Err))
       end
   end.
 
+%% list_dir_all rather than list_dir: list_dir silently drops entries whose
+%% names are not valid UTF-8, so a directory holding one would be under-reported
+%% with nothing to show for it. list_dir_all returns those as raw binaries, which
+%% is what Filename is backed by, so they survive.
 listDirImpl(Left, Right, Dir) ->
   fun() ->
-    Result = file:list_dir(Dir),
-    case Result of
-      {ok, Names} -> 
-        Right(
-          lists:map(fun(Name) ->
-            Bin = unicode:characters_to_binary(Name),
-            case filelib:is_dir(Name) of
-              true -> {left, <<Bin/binary, "/">>};
-              false -> {right, Bin}
-            end
-          end,
-          Names)
-        );
+    case file:list_dir_all(Dir) of
+      {ok, Names} ->
+        Right(lists:map(fun to_filename/1, Names));
+      {error, Err} -> Left(fileErrorToPurs(Err))
+    end
+  end.
 
+%% Decodable names come back from list_dir_all as codepoint lists, undecodable
+%% ones as raw binaries. Both are Filenames; only the first needs converting.
+to_filename(Name) when is_binary(Name) -> Name;
+to_filename(Name) -> unicode:characters_to_binary(Name).
+
+makeDirImpl(Left, Right, Dir) ->
+  fun() ->
+    case file:make_dir(Dir) of
+      ok -> Right;
       {error, Err} -> Left(fileErrorToPurs(Err))
     end
   end.
