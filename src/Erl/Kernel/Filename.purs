@@ -56,6 +56,16 @@ foreign import binaryToStringImpl :: (forall a. a -> Maybe a) -> (forall a. Mayb
 
 -- | The POSIX rule in full: a name is any non-empty byte sequence without NUL.
 -- | `/` is deliberately allowed — a `Filename` is a whole path, not one segment.
+-- |
+-- | Relative and absolute are both accepted, and neither is privileged here.
+-- | `listDir` returns bare entry names, so a relative `Filename` is the normal
+-- | output of this module rather than an edge case. The runtime resolves one
+-- | against the emulator's cwd, which is process-global and mutable, so whether
+-- | that is acceptable is a question about the caller and not about the name —
+-- | which makes it the wrong question for a bindings library to answer. A
+-- | caller wanting the discipline should get it from whatever builds its paths:
+-- | a `toFilename :: Path Abs b -> Filename` with no `Rel` overload states
+-- | "supply a base" once, in a signature, instead of at every call.
 filename :: String -> Maybe Filename
 filename s
   | s == "" = Nothing
