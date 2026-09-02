@@ -279,6 +279,11 @@ listDirImpl(Left, Right, Dir) ->
 
 %% Decodable names come back from list_dir_all as codepoint lists, undecodable
 %% ones as raw binaries. Both are Filenames; only the first needs converting.
+%%
+%% "The bytes as they are on disk" holds while file:native_name_encoding() is
+%% utf8, which is the default on every platform we run. Under +fna the emulator
+%% hands back byte lists and this re-encodes anything >= 0x80, so the Filename
+%% would not name the file. Same as it ever was, but the promise is conditional.
 to_filename(Name) when is_binary(Name) -> Name;
 to_filename(Name) -> unicode:characters_to_binary(Name).
 
@@ -340,9 +345,12 @@ fileTypeToPurs(symlink) -> {symlink};
 %% because the record doubles as write_file_info's input.
 fileTypeToPurs(_) -> {otherFileType}.
 
-%% No catch-all constructor to hide behind here, so an unknown access maps to
-%% none -- claiming less access than the file has, which is the safe direction to
-%% be wrong in.
+%% none is a documented #file_info.access value, so it is listed rather than
+%% left to the catch-all -- the only atom that actually reaches the last clause
+%% is undefined, which a read never produces (the record admits it because it
+%% doubles as write_file_info's input). Mapping the unknown to none claims less
+%% access than the file has, which is the safe direction to be wrong in.
+fileAccessToPurs(none) -> {accessNone};
 fileAccessToPurs(read) -> {accessRead};
 fileAccessToPurs(write) -> {accessWrite};
 fileAccessToPurs(read_write) -> {accessReadWrite};
