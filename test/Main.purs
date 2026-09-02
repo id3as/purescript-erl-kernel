@@ -17,6 +17,9 @@ import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
 import Erl.Kernel.File (FileAccess(..), FileError(..), FileType(..), Filename, PosixError(..), filename, filenameToString, listDir, makeDir, readFile, readFileInfo, readLinkInfo, writeFile)
+import Erl.Kernel.Filename (Abs, Dir, File, Name, Path, Rel, currentDir, dir, extension, file, file', joinName, name, nameToString, parseAbsDir, parseAbsFile, parseRelDir, parseRelFile, peel, peelFile, printPath, rename, rootDir, splitName, toFilename, (</>), (<.>))
+import Data.Tuple (Tuple(..))
+import Type.Proxy (Proxy(..))
 import Erl.Data.List (List)
 import Erl.Data.List as List
 import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), ConnectError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
@@ -43,6 +46,7 @@ main =
         ipTests
         exceptionTests
         fileTests
+        pathTests
 
 data Msg = Ready
 
@@ -558,3 +562,175 @@ unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
 
 unsafeFromRight :: forall a b. String -> Either a b -> b
 unsafeFromRight s = fromRight' (\_ -> unsafeCrashWith s)
+
+pathTests :: Free TestF Unit
+pathTests = do
+  suite "path: what it refuses" do
+    -- The point of the whole exercise. The structural representation this
+    -- replaced *resolved* `..` while parsing, so a traversal string arrived as
+    -- a perfectly good absolute path and nothing downstream could tell.
+    test "`..` is rejected, not resolved" $ liftEffect do
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile "/data/../../../etc/passwd" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile "/../x" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile "/a/b/../c" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsDir "/a/../b/" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseRelFile "../x" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseRelDir "a/../../b/" }
+
+    test "a NUL anywhere in a path is rejected" $ liftEffect do
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile ("/a/b" <> nul <> "c") }
+
+    test "a name is one segment, and not a navigational one" $ liftEffect do
+      assertEqual { expected: Nothing, actual: nameToString <$> (name "" :: Maybe (Name File)) }
+      assertEqual { expected: Nothing, actual: nameToString <$> (name "." :: Maybe (Name File)) }
+      assertEqual { expected: Nothing, actual: nameToString <$> (name ".." :: Maybe (Name File)) }
+      assertEqual { expected: Nothing, actual: nameToString <$> (name "a/b" :: Maybe (Name File)) }
+      assertEqual { expected: Nothing, actual: nameToString <$> (name ("a" <> nul <> "b") :: Maybe (Name File)) }
+      assertEqual { expected: Just "a.b", actual: nameToString <$> (name "a.b" :: Maybe (Name File)) }
+
+  suite "path: printing" do
+    -- Byte-compatibility with the structural printer is a live constraint, not
+    -- a nicety: absolute paths are printed into the generated engine config and
+    -- into outbound HTTP request paths, and a running deployment compares them.
+    test "an absolute path prints exactly as the structural printer did" $ liftEffect do
+      assertEqual { expected: "/", actual: printPath rootDir }
+      assertEqual { expected: "/a/", actual: printPath (rootDir </> dir (Proxy :: _ "a")) }
+      assertEqual { expected: "/a/b/", actual: printPath (rootDir </> dir (Proxy :: _ "a") </> dir (Proxy :: _ "b")) }
+      assertEqual { expected: "/a/b", actual: printPath (rootDir </> dir (Proxy :: _ "a") </> file (Proxy :: _ "b")) }
+      assertEqual { expected: "/b", actual: printPath (rootDir </> file (Proxy :: _ "b")) }
+
+    test "a directory keeps its trailing separator, because ensure_dir reads it" $ liftEffect do
+      assertEqual { expected: Just "/a/b/", actual: printPath <$> parseAbsDir "/a/b" }
+      assertEqual { expected: Just "/a/b/", actual: printPath <$> parseAbsDir "/a/b/" }
+
+    test "a relative path prints bare -- no `./`, and nothing absolutized" $ liftEffect do
+      assertEqual { expected: "", actual: printPath currentDir }
+      assertEqual { expected: "a/", actual: printPath (dir (Proxy :: _ "a")) }
+      assertEqual { expected: "a", actual: printPath (file (Proxy :: _ "a")) }
+
+  suite "path: composing" do
+    test "appending is containment: the result is under the base, by construction" $ liftEffect do
+      assertEqual { expected: "/srv/app/cache/x.log", actual: printPath (absDir "/srv/app/" </> dir (Proxy :: _ "cache") </> file (Proxy :: _ "x.log")) }
+
+    test "currentDir is the identity for appending" $ liftEffect do
+      assertEqual { expected: "a/b", actual: printPath (currentDir </> relFile "a/b") }
+
+    test "no double separator, whatever the base" $ liftEffect do
+      assertEqual { expected: "/a", actual: printPath (rootDir </> relFile "a") }
+      assertEqual { expected: "/a/b/", actual: printPath (absDir "/a" </> relDir "b") }
+
+  suite "path: parsing" do
+    -- A trailing slash positively asserts Dir; its absence asserts nothing.
+    -- The structural parser read a missing separator as "this names a file",
+    -- so `parseAbsDir "/a/b"` used to fail -- which is to say it rejected most
+    -- directory strings anyone would actually write in a config file.
+    test "a trailing slash asserts Dir; its absence asserts nothing" $ liftEffect do
+      assertEqual { expected: Just "/a/b/", actual: printPath <$> parseAbsDir "/a/b" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile "/a/b/" }
+      assertEqual { expected: Just "/a/b", actual: printPath <$> parseAbsFile "/a/b" }
+
+    test "empty and `.` segments collapse, as they did before" $ liftEffect do
+      assertEqual { expected: Just "/foo/bar/", actual: printPath <$> parseAbsDir "/foo/././//bar/" }
+      assertEqual { expected: Just "/foo/bar", actual: printPath <$> parseAbsFile "//foo///bar" }
+
+    test "abs and rel are decided by the leading slash alone" $ liftEffect do
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile "a/b" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseRelFile "/a/b" }
+      assertEqual { expected: Just "/", actual: printPath <$> parseAbsDir "/" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsFile "/" }
+
+    test "the empty string is not a path" $ liftEffect do
+      assertEqual { expected: Nothing, actual: printPath <$> parseAbsDir "" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseRelDir "" }
+      assertEqual { expected: Nothing, actual: printPath <$> parseRelFile "" }
+
+    test "`.` on its own is the current directory" $ liftEffect do
+      assertEqual { expected: Just "", actual: printPath <$> parseRelDir "." }
+      assertEqual { expected: Nothing, actual: printPath <$> parseRelFile "." }
+
+  suite "path: taking apart" do
+    test "peel splits off the terminal segment" $ liftEffect do
+      assertEqual { expected: Just { parent: "/a/", entry: "b" }, actual: peeled (absFile "/a/b") }
+      assertEqual { expected: Just { parent: "/", entry: "b" }, actual: peeled (absFile "/b") }
+      assertEqual { expected: Just { parent: "/a/", entry: "b" }, actual: peeledDir (absDir "/a/b/") }
+      assertEqual { expected: Nothing, actual: peeledDir rootDir }
+      assertEqual { expected: Nothing, actual: peeledRelDir currentDir }
+
+    test "peelFile is total, and round-trips" $ liftEffect do
+      let Tuple parent entry = peelFile (absFile "/a/b/c")
+      assertEqual { expected: "/a/b/c", actual: printPath (parent </> file' entry) }
+
+    test "renaming touches only the terminal segment" $ liftEffect do
+      assertEqual { expected: "/a/xb", actual: printPath (rename (\n -> nm "x" <> n) (absFile "/a/b")) }
+      assertEqual { expected: "/a/xb/", actual: printPath (rename (\n -> nm "x" <> n) (absDir "/a/b/")) }
+      assertEqual { expected: "/", actual: printPath (rename (\n -> nm "x" <> n) rootDir) }
+
+  suite "path: names and extensions" do
+    test "splitName and joinName round-trip" $ liftEffect do
+      assertEqual { expected: "foo.baz", actual: nameToString (joinName (splitName (nm "foo.baz"))) }
+      assertEqual { expected: "foo", actual: nameToString (joinName (splitName (nm "foo"))) }
+      assertEqual { expected: ".foo", actual: nameToString (joinName (splitName (nm ".foo"))) }
+      assertEqual { expected: "foo.", actual: nameToString (joinName (splitName (nm "foo."))) }
+
+    test "an extension is the part after the last dot, when there is one either side" $ liftEffect do
+      assertEqual { expected: Just "baz", actual: nameToString <$> extension (nm "foo.baz") }
+      assertEqual { expected: Just "baz", actual: nameToString <$> extension (nm "foo.bar.baz") }
+      assertEqual { expected: Nothing, actual: nameToString <$> extension (nm ".foo") }
+      assertEqual { expected: Nothing, actual: nameToString <$> extension (nm "foo.") }
+      assertEqual { expected: Nothing, actual: nameToString <$> extension (nm "foo") }
+
+    test "setting an extension replaces rather than appends" $ liftEffect do
+      assertEqual { expected: "/a/image.png", actual: printPath (absFile "/a/image.jpg" <.> nm "png") }
+      assertEqual { expected: "/a/image.png", actual: printPath (absFile "/a/image" <.> nm "png") }
+
+    -- The prefix sites in norsk build a name by concatenating one onto
+    -- another; the Semigroup is what keeps them total once the constructor
+    -- closes. Note what is NOT expressible this way: `nm "."` is not a valid
+    -- Name, so a dotted join goes through joinName, which is the point.
+    test "appending two names is a name, so prefixing stays total" $ liftEffect do
+      assertEqual { expected: "worker-daemon-17", actual: nameToString (nm "worker-daemon-" <> nm "17") }
+      assertEqual { expected: Nothing, actual: nameToString <$> (name "." :: Maybe (Name File)) }
+      assertEqual { expected: "a.b", actual: nameToString (joinName { name: nm "a", ext: Just (nm "b") }) }
+
+  suite "path: the runtime boundary" do
+    test "toFilename hands over exactly what printPath shows" $ liftEffect do
+      assertEqual { expected: Just "/a/b", actual: filenameToString (toFilename (absFile "/a/b")) }
+      assertEqual { expected: Just "/a/b/", actual: filenameToString (toFilename (absDir "/a/b/")) }
+
+    -- There is no Rel overload for toFilename and this cannot be tested for at
+    -- runtime: the whole point is that `toFilename (file (Proxy :: _ "x"))`
+    -- does not typecheck. Recorded here so the property is not silently lost.
+    test "there is no relative overload -- see the comment" $ liftEffect do
+      assertEqual { expected: unit, actual: unit }
+
+-- | A PureScript `\\x` escape is greedy, so `"a\\x0000b"` is one codepoint 0xB
+-- | rather than a NUL followed by `b`. Spelling it separately is the only way
+-- | to get a NUL next to anything.
+nul :: String
+nul = "\x0000"
+
+-- | A `Name` from a literal, for tests. The four clauses are checked; a test
+-- | that trips one is a broken test.
+nm :: forall b. String -> Name b
+nm = unsafeFromJust "test names must be valid" <<< name
+
+absDir :: String -> Path Abs Dir
+absDir = unsafeFromJust "test abs dir" <<< parseAbsDir
+
+absFile :: String -> Path Abs File
+absFile = unsafeFromJust "test abs file" <<< parseAbsFile
+
+relDir :: String -> Path Rel Dir
+relDir = unsafeFromJust "test rel dir" <<< parseRelDir
+
+relFile :: String -> Path Rel File
+relFile = unsafeFromJust "test rel file" <<< parseRelFile
+
+peeled :: Path Abs File -> Maybe { parent :: String, entry :: String }
+peeled p = (\(Tuple parent entry) -> { parent: printPath parent, entry: nameToString entry }) <$> peel p
+
+peeledDir :: Path Abs Dir -> Maybe { parent :: String, entry :: String }
+peeledDir p = (\(Tuple parent entry) -> { parent: printPath parent, entry: nameToString entry }) <$> peel p
+
+peeledRelDir :: Path Rel Dir -> Maybe { parent :: String, entry :: String }
+peeledRelDir p = (\(Tuple parent entry) -> { parent: printPath parent, entry: nameToString entry }) <$> peel p
