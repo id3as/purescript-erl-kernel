@@ -16,8 +16,3 @@ in  upstream
     , dependencies = [ "erl-lists", "maybe", "prelude" ]
     , version = "e3a5da78a9264a800eb7bad918a58de5ac57ba4c"
     }
-  with pathy =
-    { repo = "https://github.com/id3as/purescript-pathy.git"
-    , version = "c23c7b772c37bc499503ea63867287200fa44966"
-    , dependencies = [ "prelude" ]
-    }

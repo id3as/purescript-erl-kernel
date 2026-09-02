@@ -24,7 +24,6 @@ You can edit this file as you like.
   , "newtype"
   , "ordered-collections"
   , "partial"
-  , "pathy"
   , "prelude"
   , "record"
   , "strings"
