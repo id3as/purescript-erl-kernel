@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `Os.cmd` crashed with `badarg` whenever the command printed any character
+  above U+00FF. `os:cmd/2` decodes the command's UTF-8 output into code points,
+  and `iolist_to_binary/1` only accepts bytes, so e.g. systemd's
+  `Created symlink a → b` was fatal. Output is now encoded with
+  `unicode:characters_to_binary/1`; bytes that are not valid UTF-8 come through
+  as their Latin-1 characters, as `os:cmd/2` hands them over. The command
+  itself is decoded the same way, so a non-ASCII command is no longer
+  double-encoded.
+
 ## v1.0.0
 
 The first tag since `v0.0.3` (February 2022), and the first major. Everything

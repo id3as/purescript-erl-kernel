@@ -6,9 +6,12 @@
         , setEnv/2
         ]).
 
+%% os:cmd/2 takes and returns lists of unicode code points (it decodes the
+%% command's UTF-8 output, passing invalid bytes through as-is), so convert with
+%% the unicode module: iolist_to_binary/1 raises badarg on any code point > 255.
 cmdImpl(Command) ->
     fun() ->
-            iolist_to_binary(os:cmd(binary_to_list(Command), #{ max_size => infinity }))
+            unicode:characters_to_binary(os:cmd(unicode:characters_to_list(Command), #{ max_size => infinity }))
     end.
 
 osType() ->
